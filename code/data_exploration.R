@@ -34,7 +34,10 @@ ggplot(dat, aes(lag_BB_ph, log_R)) +
 check <- dat %>%
   filter(year %in% 1976:2010)
 
-ccf(check$log_S, check$log_R) # looks like lag 2 is strongest
+png("./figs/R_S_ccf.png", width = 5, height = 5, units = 'in', res = 300)
+ccf(check$log_S, check$log_R, main = "log(S), log(R) cross-correlation", ) # looks like lag 2 is strongest
+dev.off()
+
 
 check.ccf <- ccf(check$log_S, check$log_R)
 
