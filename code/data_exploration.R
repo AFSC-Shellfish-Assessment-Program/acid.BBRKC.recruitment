@@ -30,71 +30,110 @@ ggplot(dat, aes(lag_BB_ph50m, log_R)) +
 ggplot(dat, aes(lag_BB_ph, log_R)) +
   geom_point()
 
-# cross-correlations for S and R
-check <- dat %>%
-  filter(year %in% 1976:2010)
+# age distributions of recruits in assessment model
+# these are the proportions assigned to
+# 65-70mm, 70-75mm, 75-80mm, 80-85mm, 85-90mm, 90-95mm, 95-100mm
 
-png("./figs/R_S_ccf.png", width = 5, height = 5, units = 'in', res = 300)
-ccf(check$log_S, check$log_R, main = "log(S), log(R) cross-correlation", ) # looks like lag 2 is strongest
-dev.off()
+# Males proportions:
+#   
+#   0.26821432   0.32387433   0.24116113   0.11710765   0.03887032   0.00917743   0.00159482
+# 
+# Female proportions:
+#   
+#   0.27245822   0.38053177   0.24900488   0.08292921   0.01507593
 
-
-check.ccf <- ccf(check$log_S, check$log_R)
-
-check.ccf
+# start with assumed age of 5 for model recruits
 
 dat <- dat %>%
-  mutate(lag2_S = lag(mat_fem_GE90, 2),
-         log_R_S = log(rec/lag2_S),
+  mutate(lag5_S = lag(mat_fem_GE90, 5),
+         log_R_S = log(rec/lag5_S))
+
+
+ggplot(dat, aes(lag5_S, rec)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 4))
+
+ggplot(dat, aes(lag5_S, log_R_S)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 4)) # overfit
+
+
+ggplot(dat, aes(lag5_S, log_R_S)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 3))
+
+
+mod1_truncated <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat[dat$year %in% 1977:2010,])
+summary(mod1_truncated)
+plot(mod1_truncated, resid = T, pch = 19)
+
+mod1 <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat)
+summary(mod1)
+plot(mod1, resid = T, pch = 19)
+
+# no S-R relationship to account for
+
+# add in pH data at appropriate lags
+temp <- dat %>%
+  filter(year >= 1980)
+
+ccf(temp$BB_pH, temp$log_R_S)
+
+
+dat <- dat %>%
+  mutate(BB_pH_lag4 = lag(BB_pH, 4),
+         BB_pH_lag3 = lag(BB_pH, 3),
          BB_pH_lag2 = lag(BB_pH, 2),
-         BB_pH50m_lag2 = lag(BB_pH50m, 2))
+         BB_pH_lag1 = lag(BB_pH, 1))
 
-dat$BB_ph_lag0_1 <- dat$BB_ph_lag1_2 <- dat$BB_ph_50m_lag1_2 <- NA
 
-for(i in 3:nrow(dat)){
- 
-dat$BB_ph_lag0_1[i] <- mean(dat[i,2], dat[i,8]) 
-dat$BB_ph_lag1_2[i] <- mean(dat[i,8], dat[i,12])
-dat$BB_ph_50m_lag1_2[i] <- mean(dat[i,9], dat[i,13])
+dat$BB_ph_lag4_3 <- dat$BB_ph_lag4_3_2 <- dat$BB_ph_lag4_3_2_1 <- dat$BB_ph_lag4_3_2_1_0 <- NA
+
+for(i in 5:nrow(dat)){
+  
+  dat$BB_ph_lag4_3_2_1_0[i] <- mean(as.vector(c(dat[i,2], dat[i,12], dat[i,13], dat[i,14], dat[i,15]))) 
+
+  dat$BB_ph_lag4_3_2_1[i] <- mean(as.vector(c(dat[i,12], dat[i,13], dat[i,14], dat[i,15])))
+
+  dat$BB_ph_lag4_3_2[i] <- mean(as.vector(c(dat[i,12], dat[i,13], dat[i,14])))
+
+  dat$BB_ph_lag4_3[i] <- mean(as.vector(c(dat[i,12], dat[i,13])))
+  
 }
 
-mod1_truncated <- gam(log_R_S ~ s(lag2_S, k = 4), data = dat[dat$year %in% 1977:2010,])
-summary(mod1_truncated)
-plot(mod1_truncated)
+# start with the expectation that we observe a pH effect at lag 4 (1-yr-olds) and build out with 
+# more lags to account for possible effects at age 2, 3, 4, 5
 
-mod1 <- gam(log_R_S ~ s(lag2_S, k = 4), data = dat)
-summary(mod1)
-
-mod2 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(BB_ph_lag1_2, k = 4), data = dat)
+mod2 <- gam(log_R_S ~ s(BB_pH_lag4, k = 4), data = dat)
 summary(mod2)
 
-mod3 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(BB_ph_50m_lag1_2, k = 4), data = dat)
+mod3 <- gam(log_R_S ~ s(BB_ph_lag4_3, k = 4), data = dat)
 summary(mod3)
 
-MuMIn::AICc(mod1, mod2, mod3) # mod 2 and 3 are nearly identical
+mod4 <- gam(log_R_S ~ s(BB_ph_lag4_3_2, k = 4), data = dat)
+summary(mod4)
+
+mod5 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1, k = 4), data = dat)
+summary(mod5)
+
+mod6 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1_0, k = 4), data = dat)
+summary(mod6)
+
+
+MuMIn::AICc(mod2, mod3, mod4, mod5, mod6) # very similar, mod6 is *slightly* better than mod2
 
 gam.check(mod2)
 
 plot(mod2, resid = T, se = F, pch = 19)
 
-mod4 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(lag_BB_ph, k = 4), data = dat)
-summary(mod4)
+gam.check(mod6)
 
-mod5 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(BB_pH_lag2, k = 4), data = dat)
-summary(mod5)
+plot(mod6, resid = T, se = F, pch = 19)
 
-mod6 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(BB_pH, k = 4), data = dat)
-summary(mod6)
 
-MuMIn::AICc(mod1, mod2, mod3, mod4, mod5, mod6)
-
-mod7 <- gam(log_R_S ~ s(lag2_S, k = 4) + s(BB_ph_lag0_1, k = 4), data = dat)
-summary(mod7)
-
-MuMIn::AICc(mod1, mod2, mod3, mod4, mod5, mod6, mod7)
 
 ## fit brms version of model 2
-form <- bf(log_R_S ~ 1 + s(lag2_S) + s(BB_ph_lag1_2) + ar(time = year, p = 1, cov = TRUE))
+form <- bf(log_R_S ~ 1 + s(BB_pH_lag4, k = 4) + ar(time = year, p = 1, cov = TRUE))
 
 priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
             set_prior("student_t(3, 0, 3)", class = "b"),
@@ -128,70 +167,74 @@ bayes_R2(brms_model2)
 
 plot(conditional_smooths(brms_model2), ask = FALSE)
 
+######
+## fit brms version of model 6
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE))
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term --------------------------------------
+brms_model6 <- brm(form,
+                   data = dat,
+                   prior = priors,
+                   cores = 4, chains = 4, iter = 3000,
+                   save_pars = save_pars(all = TRUE),
+                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model6, file = "./output/brms_model6.rds")
+
+brms_model6 <- readRDS("./output/brms_model6.rds")
+
+check_hmc_diagnostics(brms_model6$fit)
+
+neff_lowest(brms_model6$fit)
+
+rhat_highest(brms_model6$fit)
+
+summary(brms_model6)
+
+bayes_R2(brms_model6)
+
+plot(conditional_smooths(brms_model6), ask = FALSE)
+
+
+## model comparison
+brms_model2 <- add_criterion(brms_model2, "loo")
+brms_model6 <- add_criterion(brms_model6, "loo")
+
+loo_compare(brms_model2, brms_model6)
+# very little difference, but model 6 slightly better
+
 ## plot 
 
-
-# first, spawner effect
+# pH effect
 
 ## 95% CI
-ce1s_1 <- conditional_effects(brms_model2, effect = "lag2_S", re_formula = NA,
+ce1s_1 <- conditional_effects(brms_model6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms_model2, effect = "lag2_S", re_formula = NA,
+ce1s_2 <- conditional_effects(brms_model6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms_model2, effect = "lag2_S", re_formula = NA,
+ce1s_3 <- conditional_effects(brms_model6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
-dat_ce <- ce1s_1$lag2_S
+dat_ce <- ce1s_1$BB_ph_lag4_3_2_1_0
 
 #########################
 
 dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
 dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
-dat_ce[["upper_90"]] <- ce1s_2$lag2_S[["upper__"]]
-dat_ce[["lower_90"]] <- ce1s_2$lag2_S[["lower__"]]
-dat_ce[["upper_80"]] <- ce1s_3$lag2_S[["upper__"]]
-dat_ce[["lower_80"]] <- ce1s_3$lag2_S[["lower__"]]
-dat_ce[["rug.anom"]] <- c(jitter(unique(dat$lag2_S), amount = 0.0051),
-                          rep(NA, 100-length(unique(dat$lag2_S))))
+dat_ce[["upper_90"]] <- ce1s_2$BB_ph_lag4_3_2_1_0[["upper__"]]
+dat_ce[["lower_90"]] <- ce1s_2$BB_ph_lag4_3_2_1_0[["lower__"]]
+dat_ce[["upper_80"]] <- ce1s_3$BB_ph_lag4_3_2_1_0[["upper__"]]
+dat_ce[["lower_80"]] <- ce1s_3$BB_ph_lag4_3_2_1_0[["lower__"]]
 
-
-g1 <- ggplot(dat_ce) +
-  aes(x = effect1__, y = estimate__) +
-  geom_ribbon(aes(ymin = lower_95, ymax = upper_95), fill = "grey90") +
-  geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
-  geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
-  geom_line(size = 1.5, color = "red3") +
-  labs(x = "Mature female abundance, lag 2", y = "log(R/S)") +
-  theme_bw() +
-  geom_hline(yintercept = 0, lty = 2) +
-  geom_rug(aes(x=rug.anom, y=NULL)) 
-
-print(g1)
-
-# now, pH effect
-
-## 95% CI
-ce1s_1 <- conditional_effects(brms_model2, effect = "BB_ph_lag1_2", re_formula = NA,
-                              prob = 0.95)
-## 90% CI
-ce1s_2 <- conditional_effects(brms_model2, effect = "BB_ph_lag1_2", re_formula = NA,
-                              prob = 0.9)
-## 80% CI
-ce1s_3 <- conditional_effects(brms_model2, effect = "BB_ph_lag1_2", re_formula = NA,
-                              prob = 0.8)
-dat_ce <- ce1s_1$BB_ph_lag1_2
-
-#########################
-
-dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
-dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
-dat_ce[["upper_90"]] <- ce1s_2$BB_ph_lag1_2[["upper__"]]
-dat_ce[["lower_90"]] <- ce1s_2$BB_ph_lag1_2[["lower__"]]
-dat_ce[["upper_80"]] <- ce1s_3$BB_ph_lag1_2[["upper__"]]
-dat_ce[["lower_80"]] <- ce1s_3$BB_ph_lag1_2[["lower__"]]
-dat_ce[["rug.anom"]] <- c(jitter(unique(dat$BB_ph_lag1_2), amount = 0.0051),
-                          rep(NA, 100-length(unique(dat$BB_ph_lag1_2))))
 
 
 g2 <- ggplot(dat_ce) +
@@ -200,9 +243,9 @@ g2 <- ggplot(dat_ce) +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Bristol Bay mean pH, lag 1-2", y = "log(R/S)") +
+  labs(x = "Bristol Bay mean pH, lag 0-4", y = "log(R/S)") +
   theme_bw() + 
-  geom_rug(aes(x=rug.anom, y=NULL)) + 
+  geom_text(data = dat, aes(x=BB_ph_lag4_3_2_1_0, y=log_R_S, label = year)) + 
   scale_x_reverse()
 
 print(g2)
