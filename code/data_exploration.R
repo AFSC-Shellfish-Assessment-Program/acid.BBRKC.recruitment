@@ -251,3 +251,37 @@ g2 <- ggplot(dat_ce) +
 print(g2)
 
 ggsave("./figs/brms_model6_pH_effect.png", width = 4.5, height = 3, units = 'in')
+
+## model selection in brms------------------
+
+# using the same formulation as for mgcv model selection above
+mod3 <- gam(log_R_S ~ s(BB_ph_lag4_3, k = 4), data = dat)
+
+mod4 <- gam(log_R_S ~ s(BB_ph_lag4_3_2, k = 4), data = dat)
+
+mod5 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1, k = 4), data = dat)
+
+mod6 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1_0, k = 4), data = dat)
+
+
+## fit brms version of model 3
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3, k = 4) + ar(time = year, p = 1, cov = TRUE))
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term --------------------------------------
+brms_model3 <- brm(form,
+                   data = dat,
+                   prior = priors,
+                   cores = 4, chains = 4, iter = 3000,
+                   save_pars = save_pars(all = TRUE),
+                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model2, file = "./output/brms_model2.rds")
+
