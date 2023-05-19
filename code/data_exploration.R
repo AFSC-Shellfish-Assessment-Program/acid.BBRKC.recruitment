@@ -275,7 +275,7 @@ priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
 
 
 
-## fit model with covariance in ar term --------------------------------------
+## fit model with covariance in ar term 
 brms_model3 <- brm(form,
                    data = dat,
                    prior = priors,
@@ -283,5 +283,58 @@ brms_model3 <- brm(form,
                    save_pars = save_pars(all = TRUE),
                    control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-saveRDS(brms_model2, file = "./output/brms_model2.rds")
+saveRDS(brms_model3, file = "./output/brms_model3.rds")
 
+## fit brms version of model 4
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2, k = 4) + ar(time = year, p = 1, cov = TRUE))
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term 
+brms_model4 <- brm(form,
+                   data = dat,
+                   prior = priors,
+                   cores = 4, chains = 4, iter = 3000,
+                   save_pars = save_pars(all = TRUE),
+                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model4, file = "./output/brms_model4.rds")
+
+## fit brms version of model 5
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE))
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term 
+brms_model5 <- brm(form,
+                   data = dat,
+                   prior = priors,
+                   cores = 4, chains = 4, iter = 3000,
+                   save_pars = save_pars(all = TRUE),
+                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model5, file = "./output/brms_model5.rds")
+
+## brms model selection ---------------------------------
+
+# load all the model objects
+
+brms2 <- readRDS("./output/brms_model2.rds")
+brms3 <- readRDS("./output/brms_model3.rds")
+brms4 <- readRDS("./output/brms_model4.rds")
+brms5 <- readRDS("./output/brms_model5.rds")
+brms6 <- readRDS("./output/brms_model6.rds")
+
+loo(brms2, brms3, brms4, brms5, brms6, moment_match = T, reloo = T)
