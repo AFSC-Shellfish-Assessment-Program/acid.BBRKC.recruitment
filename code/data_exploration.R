@@ -10,6 +10,8 @@ source("./code/stan_utils.R")
 
 theme_set(theme_bw())
 
+cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
 # load data
 rdat <- read.csv("./data/recruit_mfem_out.csv", row.names = 1)
 phdat <- read.csv("./data/pH_annual_values.csv") %>%
@@ -428,3 +430,49 @@ g_mod4 <- ggplot(dat_ce) +
 print(g_mod4)
 
 ggsave("./figs/brms_model6_pH_effect.png", width = 4.5, height = 3, units = 'in')
+
+## plot time series ------------------
+
+plot_rkc <- dat %>%
+  select(year, mat_fem_GE90, rec) %>%
+  filter(year >= 1975)
+
+names(plot_rkc)[2:3] <- c("Mature females", "Recruits")
+
+plot_rkc <- plot_rkc %>%
+  pivot_longer(cols = -year)
+
+crab_plot <- ggplot(plot_rkc, aes(year, value, color = name)) +
+  geom_point() +
+  geom_line() +
+  scale_color_manual(values = cb[c(2,6)]) +
+  theme(axis.title.x = element_blank(),
+        legend.position = c(0.8, 0.8),
+        legend.title = element_blank()) +
+  ylab("Abundance (millions)")
+
+crab_plot
+
+plot_ph <- ggplot(filter(dat, year >= 1975), aes(year, BB_pH)) +
+  geom_point() +
+  geom_line() +
+  theme(axis.title.x = element_blank()) +
+  ylab("Mean pH")
+
+plot_ph
+
+plot_R.S <- ggplot(filter(dat, year >= 1975), aes(year, log_R_S)) +
+  geom_point() +
+  geom_line() +
+  theme(axis.title.x = element_blank()) +
+  ylab("ln(recruits/spawner)")
+
+plot_R.S
+
+# combine
+
+png("./figs/time_series_plot.png", width = 4.5, height  = 8, units = 'in', res = 300)
+
+ggpubr::ggarrange(plot_ph, crab_plot, plot_R.S, ncol = 1, labels = c("b", "c", "d"))
+
+dev.off()
