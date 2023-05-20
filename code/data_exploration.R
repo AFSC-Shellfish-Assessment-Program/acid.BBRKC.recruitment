@@ -373,3 +373,58 @@ png("./figs/model_selection_best_model_plot.png", width = 9.5, height = 4, units
 ggpubr::ggarrange(compare_plot, g2, ncol = 2, widths = c(0.45, 0.55), labels = "auto")
 
 dev.off()
+
+## plot least-supported model -------------------------
+
+brms_model4 <- readRDS("./output/brms_model4.rds")
+
+check_hmc_diagnostics(brms_model4$fit)
+
+neff_lowest(brms_model4$fit)
+
+rhat_highest(brms_model4$fit)
+
+summary(brms_model4)
+
+bayes_R2(brms_model6)
+
+## plot 
+
+# pH effect
+
+## 95% CI
+ce1s_1 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+                              prob = 0.95)
+## 90% CI
+ce1s_2 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+                              prob = 0.9)
+## 80% CI
+ce1s_3 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+                              prob = 0.8)
+dat_ce <- ce1s_1$BB_ph_lag4_3_2
+
+#########################
+
+dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
+dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
+dat_ce[["upper_90"]] <- ce1s_2$BB_ph_lag4_3_2[["upper__"]]
+dat_ce[["lower_90"]] <- ce1s_2$BB_ph_lag4_3_2[["lower__"]]
+dat_ce[["upper_80"]] <- ce1s_3$BB_ph_lag4_3_2[["upper__"]]
+dat_ce[["lower_80"]] <- ce1s_3$BB_ph_lag4_3_2[["lower__"]]
+
+
+
+g_mod4 <- ggplot(dat_ce) +
+  aes(x = effect1__, y = estimate__) +
+  geom_ribbon(aes(ymin = lower_95, ymax = upper_95), fill = "grey90") +
+  geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
+  geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
+  geom_line(size = 1.5, color = "red3") +
+  labs(x = "Bristol Bay mean pH, ages 1-3", y = "ln(R/S)") +
+  theme_bw() + 
+  geom_text(data = dat, aes(x=BB_ph_lag4_3_2, y=log_R_S, label = year)) + 
+  scale_x_reverse()
+
+print(g_mod4)
+
+ggsave("./figs/brms_model6_pH_effect.png", width = 4.5, height = 3, units = 'in')
