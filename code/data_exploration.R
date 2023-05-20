@@ -243,7 +243,7 @@ g2 <- ggplot(dat_ce) +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Bristol Bay mean pH, lag 0-4", y = "log(R/S)") +
+  labs(x = "Bristol Bay mean pH, ages 1-5", y = "ln(R/S)") +
   theme_bw() + 
   geom_text(data = dat, aes(x=BB_ph_lag4_3_2_1_0, y=log_R_S, label = year)) + 
   scale_x_reverse()
@@ -337,4 +337,39 @@ brms4 <- readRDS("./output/brms_model4.rds")
 brms5 <- readRDS("./output/brms_model5.rds")
 brms6 <- readRDS("./output/brms_model6.rds")
 
-loo(brms2, brms3, brms4, brms5, brms6, moment_match = T, reloo = T)
+
+loo_compare <- loo(brms2, brms3, brms4, brms5, brms6)
+
+str(loo_compare)
+
+# save 
+saveRDS(loo_compare, "./output/brms_model_comparison.rds")
+
+loo_compare <- readRDS("./output/brms_model_comparison.rds")
+
+plot <- as.data.frame(loo_compare$diffs) %>%
+  mutate(model_number = 1:5,
+         Age = c("1-5", "1", "1-4", "1-2", "1-3")) %>%
+  arrange(model_number)
+
+# change se_diff = 0 to NA
+change <- plot$se_diff == 0
+plot$se_diff[change] <- NA
+
+
+compare_plot <- ggplot(plot, aes(model_number, elpd_diff)) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = elpd_diff - 1.96*se_diff,
+                    ymax = elpd_diff + 1.96*se_diff)) +
+  scale_x_continuous(breaks = 1:5, labels = plot$Age) +
+  labs(x = "Age of modeled effect",
+       y = "ELPD difference")
+
+# combine with g2 (best model)
+
+png("./figs/model_selection_best_model_plot.png", width = 9.5, height = 4, units = 'in', res = 300)
+
+ggpubr::ggarrange(compare_plot, g2, ncol = 2, widths = c(0.45, 0.55), labels = "auto")
+
+dev.off()
