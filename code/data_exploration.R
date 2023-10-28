@@ -323,6 +323,46 @@ bayes_R2(brms_model6)
 
 plot(conditional_smooths(brms_model6), ask = FALSE)
 
+###############
+## fit version with sigma modeled on ph
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term --------------------------------------
+brms_model6b <- brm(form,
+                   data = dat,
+                   seed = 999,
+                   # prior = priors,
+                   cores = 4, chains = 4, iter = 3000,
+                   save_pars = save_pars(all = TRUE),
+                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model6b, file = "./output/brms_model6b.rds")
+
+brms_model6b <- readRDS("./output/brms_model6b.rds")
+
+check_hmc_diagnostics(brms_model6b$fit)
+
+neff_lowest(brms_model6b$fit)
+
+rhat_highest(brms_model6b$fit)
+
+summary(brms_model6b)
+
+bayes_R2(brms_model6b)
+
+plot(conditional_smooths(brms_model6b), ask = FALSE)
+
+
+###############
+
 ####
 # load all the model objects
 
@@ -331,6 +371,7 @@ brms3 <- readRDS("./output/brms_model3.rds")
 brms4 <- readRDS("./output/brms_model4.rds")
 brms5 <- readRDS("./output/brms_model5.rds")
 brms6 <- readRDS("./output/brms_model6.rds")
+brms6b <- readRDS("./output/brms_model6b.rds")
 
 loo_compare <- loo(brms2, brms3, brms4, brms5, brms6)
 
@@ -362,16 +403,20 @@ compare_plot <- ggplot(plot, aes(model_number, elpd_diff)) +
 
 # really no difference, but model 6 nominally better
 
+
+
+loo(brms6, brms6b)
+
 ## plot pH effect
 
 ## 95% CI
-ce1s_1 <- conditional_effects(brms6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_1 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_2 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms6, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_3 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
 dat_ce <- ce1s_1$BB_ph_lag4_3_2_1_0
 
@@ -399,7 +444,7 @@ g2 <- ggplot(dat_ce) +
 
 print(g2)
 
-ggsave("./figs/brms_model6_pH_effect.png", width = 4.5, height = 3, units = 'in')
+ggsave("./figs/brms_model6b_pH_effect.png", width = 4.5, height = 3, units = 'in')
 
 ## model selection in brms------------------
 
