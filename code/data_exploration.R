@@ -299,7 +299,7 @@ priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
 
 
 ## fit model with covariance in ar term --------------------------------------
-brms_model6 <- brm(form,
+brms_model6a <- brm(form,
                    data = dat,
                    seed = 99,
                    prior = priors,
@@ -307,21 +307,21 @@ brms_model6 <- brm(form,
                    save_pars = save_pars(all = TRUE),
                    control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-saveRDS(brms_model6, file = "./output/brms_model6.rds")
+saveRDS(brms_model6a, file = "./output/brms_model6a.rds")
 
-brms_model6 <- readRDS("./output/brms_model6.rds")
+brms_model6a <- readRDS("./output/brms_model6a.rds")
 
-check_hmc_diagnostics(brms_model6$fit)
+check_hmc_diagnostics(brms_model6a$fit)
 
-neff_lowest(brms_model6$fit)
+neff_lowest(brms_model6a$fit)
 
-rhat_highest(brms_model6$fit)
+rhat_highest(brms_model6a$fit)
 
-summary(brms_model6)
+summary(brms_model6a)
 
-bayes_R2(brms_model6)
+bayes_R2(brms_model6a)
 
-plot(conditional_smooths(brms_model6), ask = FALSE)
+plot(conditional_smooths(brms_model6a), ask = FALSE)
 
 ###############
 ## fit version with sigma modeled on ph
@@ -450,14 +450,14 @@ brms2 <- readRDS("./output/brms_model2.rds")
 brms3 <- readRDS("./output/brms_model3.rds")
 brms4 <- readRDS("./output/brms_model4.rds")
 brms5 <- readRDS("./output/brms_model5.rds")
-brms6 <- readRDS("./output/brms_model6.rds")
+brms6a <- readRDS("./output/brms_model6a.rds")
 brms6b <- readRDS("./output/brms_model6b.rds")
 brms6c <- readRDS("./output/brms_model6c.rds")
 brms6d <- readRDS("./output/brms_model6d.rds")
 
-loo_compare <- loo(brms2, brms3, brms4, brms5, brms6)
+loo_compare <- loo(brms2, brms3, brms4, brms5, brms6a)
 
-loo(brms6, brms6b)
+loo(brms6a, brms6b)
 
 loo(brms6b, brms6c)
 
