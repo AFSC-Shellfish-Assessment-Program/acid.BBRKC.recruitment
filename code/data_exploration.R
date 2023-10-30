@@ -359,10 +359,90 @@ summary(brms_model6b)
 bayes_R2(brms_model6b)
 
 plot(conditional_smooths(brms_model6b), ask = FALSE)
+###############
+## fit version with sigma modeled on ph using smooth
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), 
+           sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            # set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model with covariance in ar term --------------------------------------
+brms_model6c <- brm(form,
+                    data = dat,
+                    seed = 999,
+                    # prior = priors,
+                    cores = 4, chains = 4, iter = 3000,
+                    save_pars = save_pars(all = TRUE),
+                    control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model6c, file = "./output/brms_model6c.rds")
+
+brms_model6c <- readRDS("./output/brms_model6c.rds")
+
+check_hmc_diagnostics(brms_model6c$fit)
+
+neff_lowest(brms_model6c$fit)
+
+rhat_highest(brms_model6c$fit)
+
+summary(brms_model6c)
+
+bayes_R2(brms_model6c)
+
+plot(conditional_smooths(brms_model6c), ask = FALSE)
+
+loo(brms6b, brms_model6c)
 
 
 ###############
 
+## fit version with sigma modeled on ph using linear relationship, but year included as covariate instead of AR1 process
+form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + s(year, k = 4), 
+           sigma ~ BB_ph_lag4_3_2_1_0)
+
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            # set_prior("student_t(3, 0, 3)", class = "sigma"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+
+## fit model -----------------------------------
+brms_model6d <- brm(form,
+                    data = dat,
+                    seed = 999,
+                    # prior = priors,
+                    cores = 4, chains = 4, iter = 3000,
+                    save_pars = save_pars(all = TRUE),
+                    control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_model6d, file = "./output/brms_model6d.rds")
+
+brms_model6d <- readRDS("./output/brms_model6d.rds")
+
+check_hmc_diagnostics(brms_model6d$fit)
+
+neff_lowest(brms_model6d$fit)
+
+rhat_highest(brms_model6d$fit)
+
+summary(brms_model6d)
+
+bayes_R2(brms_model6d)
+
+plot(conditional_smooths(brms_model6d), ask = FALSE)
+
+loo(brms6b, brms_model6d)
+
+
+###############
 ####
 # load all the model objects
 
@@ -372,8 +452,17 @@ brms4 <- readRDS("./output/brms_model4.rds")
 brms5 <- readRDS("./output/brms_model5.rds")
 brms6 <- readRDS("./output/brms_model6.rds")
 brms6b <- readRDS("./output/brms_model6b.rds")
+brms6c <- readRDS("./output/brms_model6c.rds")
+brms6d <- readRDS("./output/brms_model6d.rds")
 
 loo_compare <- loo(brms2, brms3, brms4, brms5, brms6)
+
+loo(brms6, brms6b)
+
+loo(brms6b, brms6c)
+
+loo(brms6b, brms6d)
+
 
 str(loo_compare)
 
