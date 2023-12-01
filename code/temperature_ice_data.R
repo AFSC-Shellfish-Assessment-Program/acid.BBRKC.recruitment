@@ -136,7 +136,15 @@ cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E
     pivot_wider(names_from = month,
                 values_from = mean.ice) %>%
     filter(year %in% 1975:2022)
+
+  # save raw data for plot
+  plot_ice <- ice
   
+  plot_ice$Jan_Feb_plot_ice  <- apply(plot_ice[,c(2,3)], 1, mean)
+  plot_ice$Mar_Apr_plot_ice  <- apply(plot_ice[,c(4,5)], 1, mean)
+
+  plot_ice <- plot_ice %>%
+    select(-Jan, -Feb, -Mar, -Apr)  
   
   # scale each month
 ice[,2:5] <- apply(ice[,2:5], 2, scale)
@@ -247,12 +255,21 @@ ice <- ice %>%
              year %in% 1975:2022) %>%
       pivot_wider(names_from = month,
                   values_from = mean.sst)
+
+
+    # save raw data for plot
+    plot_sst <- sst 
+    plot_sst$Jan_Jun_SST <- rowMeans(plot_sst[,2:7])
     
-# and scale
+    plot_sst <- plot_sst %>%
+      select(-c(2:7))
+        
+    
+    # and scale
     scaled_sst <- sst
     scaled_sst[,2:7] <- apply(scaled_sst[,2:7], 2, scale)
     
-# and get Jan-Jun mean
+    # and get Jan-Jun mean
 mean_scaled_sst <- data.frame(year = 1975:2022,
                               Jan_Jun_SST = rowMeans(scaled_sst[,2:7]))
   
@@ -555,6 +572,14 @@ ggplot(bottom.temp, aes(year, bottom_temp)) +
 # and scale
 scaled_bottom_temp <- bottom.temp %>%
   mutate(bottom_temp = scale(bottom_temp))
+
+#### save the ice and temp time series in original units for plotting----------------------
+
+raw_dat <- left_join(plot_ice, plot_sst) %>%
+  left_join(., bottom.temp) %>%
+  rename(June_bottom_temp = bottom_temp)
+
+write.csv(raw_dat, "./data/sst_temp_original_units.csv", row.names = F)
 
 #### combine the different time series----------------------
 
