@@ -96,9 +96,9 @@ dat <- rdat %>%
 dat <- left_join(dat, ph_dat) %>%
   left_join(., temp_dat)
 
-# remove 2022 for now (no ph estimates)
-dat <- dat %>%
-  filter(year <= 2021)
+# # remove 2022 for now (no ph estimates)
+# dat <- dat %>%
+#   filter(year <= 2021)
 
 ggplot(dat, aes(lag5_S, log_R_S)) +
   geom_point() +
