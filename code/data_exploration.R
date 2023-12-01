@@ -1,4 +1,4 @@
-# evaluate pH - recruitment relationship
+# evaluate pH - recruitment  and temperarture-recruitment relationships
 
 library(tidyverse)
 library(mgcv)
@@ -14,24 +14,65 @@ cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E
 
 # load data
 rdat <- read.csv("./data/_23_0a_recruit_mfem_out.csv", row.names = 1)
-phdat <- read.csv("./data/pH_annual_values.csv") %>%
+
+ph_dat <- read.csv("./data/pH_annual_values.csv") %>%
   rename(year = Year,
-         BB_pH = Bristol.Bay.mean,
-         BB_pH50m = Bristol.Bay...50m.mean) %>%
-  select(year, BB_pH, BB_pH50m)
+         BB_pH = Bristol.Bay.mean) %>%
+  select(year, BB_pH)
 
-dat <- left_join(phdat, rdat) %>%
-  mutate(log_R = log(rec),
-         log_S = log(mat_fem_GE90),
-         lag_BB_ph = lag(BB_pH),
-         lag_BB_ph50m = lag(BB_pH50m))
+ph_dat <- ph_dat %>%
+  mutate(BB_pH_lag4 = lag(BB_pH, 4),
+         BB_pH_lag3 = lag(BB_pH, 3),
+         BB_pH_lag2 = lag(BB_pH, 2),
+         BB_pH_lag1 = lag(BB_pH, 1))
 
-ggplot(dat, aes(lag_BB_ph50m, log_R)) +
-  geom_point()
 
-ggplot(dat, aes(lag_BB_ph, log_R)) +
-  geom_point()
+ph_dat$BB_ph_lag4_3 <- ph_dat$BB_ph_lag4_3_2 <- ph_dat$BB_ph_lag4_3_2_1 <- ph_dat$BB_ph_lag4_3_2_1_0 <- NA
 
+for(i in 1:nrow(ph_dat)){
+  
+  ph_dat$BB_ph_lag4_3_2_1_0[i] <- mean(as.vector(c(ph_dat[i,2], ph_dat[i,3], ph_dat[i,4], ph_dat[i,5], ph_dat[i,6]))) 
+  
+  ph_dat$BB_ph_lag4_3_2_1[i] <- mean(as.vector(c(ph_dat[i,3], ph_dat[i,4], ph_dat[i,5], ph_dat[i,6])))
+  
+  ph_dat$BB_ph_lag4_3_2[i] <- mean(as.vector(c(ph_dat[i,3], ph_dat[i,4], ph_dat[i,5])))
+  
+  ph_dat$BB_ph_lag4_3[i] <- mean(as.vector(c(ph_dat[i,3], ph_dat[i,4])))
+  
+}
+
+ph_dat <- ph_dat %>%
+  select(1,3,10,9,8,7)
+
+# load temperature DFA trend
+temp_dat <- read.csv("./output/dfa_trend.csv") %>%
+  rename(year = t, 
+         temp_index = estimate) %>%
+  select(year, temp_index)
+
+temp_dat <- temp_dat %>%
+  mutate(temp_index_lag4 = lag(temp_index, 4),
+         temp_index_lag3 = lag(temp_index, 3),
+         temp_index_lag2 = lag(temp_index, 2),
+         temp_index_lag1 = lag(temp_index, 1))
+
+
+temp_dat$temp_index_lag4_3 <- temp_dat$temp_index_lag4_3_2 <- temp_dat$temp_index_lag4_3_2_1 <- temp_dat$temp_index_lag4_3_2_1_0 <- NA
+
+for(i in 1:nrow(temp_dat)){
+  
+  temp_dat$temp_index_lag4_3_2_1_0[i] <- mean(as.vector(c(temp_dat[i,2], temp_dat[i,3], temp_dat[i,4], temp_dat[i,5], temp_dat[i,6]))) 
+  
+  temp_dat$temp_index_lag4_3_2_1[i] <- mean(as.vector(c(temp_dat[i,3], temp_dat[i,4], temp_dat[i,5], temp_dat[i,6])))
+  
+  temp_dat$temp_index_lag4_3_2[i] <- mean(as.vector(c(temp_dat[i,3], temp_dat[i,4], temp_dat[i,5])))
+  
+  temp_dat$temp_index_lag4_3[i] <- mean(as.vector(c(temp_dat[i,3], temp_dat[i,4])))
+  
+}
+
+temp_dat <- temp_dat %>%
+  select(1,3,10,9,8,7)
 # age distributions of recruits in assessment model
 # these are the proportions assigned to
 # 65-70mm, 70-75mm, 75-80mm, 80-85mm, 85-90mm, 90-95mm, 95-100mm
@@ -46,14 +87,18 @@ ggplot(dat, aes(lag_BB_ph, log_R)) +
 
 # start with assumed age of 5 for model recruits
 
-dat <- dat %>%
+dat <- rdat %>%
   mutate(lag5_S = lag(mat_fem_GE90, 5),
-         log_R_S = log(rec/lag5_S))
+         log_R_S = log(rec/lag5_S)) %>%
+  select(year, lag5_S, log_R_S)
 
+# add ph and temperature data
+dat <- left_join(dat, ph_dat) %>%
+  left_join(., temp_dat)
 
-ggplot(dat, aes(lag5_S, rec)) +
-  geom_point() +
-  geom_smooth(method = "gam", formula = y ~ s(x, k = 4))
+# remove 2022 for now (no ph estimates)
+dat <- dat %>%
+  filter(year <= 2021)
 
 ggplot(dat, aes(lag5_S, log_R_S)) +
   geom_point() +
@@ -64,448 +109,377 @@ ggplot(dat, aes(lag5_S, log_R_S)) +
   geom_point() +
   geom_smooth(method = "gam", formula = y ~ s(x, k = 3))
 
+# evaluate S-R relationship before recent era of low R
+mod <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat[dat$year <= 2010,])
+summary(mod)
+plot(mod, resid = T, pch = 19)
 
-mod1_truncated <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat[dat$year %in% 1977:2010,])
-summary(mod1_truncated)
-plot(mod1_truncated, resid = T, pch = 19)
-
-mod1 <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat)
-summary(mod1)
-plot(mod1, resid = T, pch = 19)
+# and for the full time series
+mod <- gam(log_R_S ~ s(lag5_S, k = 3), data = dat)
+summary(mod)
+plot(mod, resid = T, pch = 19)
 
 # no S-R relationship to account for
 
-# add in pH data at appropriate lags
-temp <- dat %>%
-  filter(year >= 1980)
-
-ccf(temp$BB_pH, temp$log_R_S)
-
-
-dat <- dat %>%
-  mutate(BB_pH_lag4 = lag(BB_pH, 4),
-         BB_pH_lag3 = lag(BB_pH, 3),
-         BB_pH_lag2 = lag(BB_pH, 2),
-         BB_pH_lag1 = lag(BB_pH, 1))
-
-
-dat$BB_ph_lag4_3 <- dat$BB_ph_lag4_3_2 <- dat$BB_ph_lag4_3_2_1 <- dat$BB_ph_lag4_3_2_1_0 <- NA
-
-for(i in 5:nrow(dat)){
-  
-  dat$BB_ph_lag4_3_2_1_0[i] <- mean(as.vector(c(dat[i,2], dat[i,12], dat[i,13], dat[i,14], dat[i,15]))) 
-
-  dat$BB_ph_lag4_3_2_1[i] <- mean(as.vector(c(dat[i,12], dat[i,13], dat[i,14], dat[i,15])))
-
-  dat$BB_ph_lag4_3_2[i] <- mean(as.vector(c(dat[i,12], dat[i,13], dat[i,14])))
-
-  dat$BB_ph_lag4_3[i] <- mean(as.vector(c(dat[i,12], dat[i,13])))
-  
-}
-
-# start with the expectation that we observe a pH effect at lag 4 (1-yr-olds) and build out with 
-# more lags to account for possible effects at age 2, 3, 4, 5
-
-mod2 <- gam(log_R_S ~ s(BB_pH_lag4, k = 4), data = dat)
-summary(mod2)
-
-mod3 <- gam(log_R_S ~ s(BB_ph_lag4_3, k = 4), data = dat)
-summary(mod3)
-
-mod4 <- gam(log_R_S ~ s(BB_ph_lag4_3_2, k = 4), data = dat)
-summary(mod4)
-
-mod5 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1, k = 4), data = dat)
-summary(mod5)
-
-mod6 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1_0, k = 4), data = dat)
-summary(mod6)
-
-
-MuMIn::AICc(mod2, mod3, mod4, mod5, mod6) # very similar, mod6 is *slightly* better than mod2
-
-gam.check(mod2)
-
-plot(mod2, resid = T, se = F, pch = 19)
-
-gam.check(mod6)
-
-plot(mod6, resid = T, se = F, pch = 19)
-
-
-
-## fit brms version of model 2
-form <- bf(log_R_S ~ 1 + s(BB_pH_lag4, k = 4) + ar(time = year, p = 1, cov = TRUE))
-
+## fit brms models with ar and sigma ~ X-----------------------------------------------------------
 priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
             set_prior("student_t(3, 0, 3)", class = "b"),
             set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
             set_prior("normal(0, 0.5)", class = "ar"))
 
+## lag 4 only
 
+# ph version
+ph_form1 <- bf(log_R_S ~ 1 + s(BB_pH_lag4, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_pH_lag4)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model2 <- brm(form,
+## fit ph
+brms_ph_model1 <- brm(ph_form1,
                       data = dat,
                       prior = priors,
-                      cores = 4, chains = 4, iter = 3000,
+                      cores = 4, chains = 4, iter = 2000,
                       save_pars = save_pars(all = TRUE),
                       control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-saveRDS(brms_model2, file = "./output/brms_model2.rds")
+saveRDS(brms_ph_model1, file = "./output/brms_ph_model1.rds")
 
-brms_model2 <- readRDS("./output/brms_model2.rds")
+brms_ph_model1 <- readRDS("./output/brms_ph_model1.rds")
 
-check_hmc_diagnostics(brms_model2$fit)
+check_hmc_diagnostics(brms_ph_model1$fit)
 
-neff_lowest(brms_model2$fit)
+neff_lowest(brms_ph_model1$fit)
 
-rhat_highest(brms_model2$fit)
+rhat_highest(brms_ph_model1$fit)
 
-summary(brms_model2)
+summary(brms_ph_model1)
 
-bayes_R2(brms_model2)
+bayes_R2(brms_ph_model1)
 
-plot(conditional_smooths(brms_model2), ask = FALSE)
+plot(conditional_smooths(brms_ph_model1), ask = FALSE)
 
-######
-## fit brms version of model 3
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3, k = 4) + ar(time = year, p = 1, cov = TRUE))
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+## fit temp
+temp_form1 <- bf(log_R_S ~ 1 + s(temp_index_lag4, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4)
 
+brms_temp_model1 <- brm(temp_form1,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
 
+saveRDS(brms_temp_model1, file = "./output/brms_temp_model1.rds")
 
-## fit model with covariance in ar term --------------------------------------
-brms_model3 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+brms_temp_model1 <- readRDS("./output/brms_temp_model1.rds")
 
-saveRDS(brms_model3, file = "./output/brms_model3.rds")
+check_hmc_diagnostics(brms_temp_model1$fit)
 
-brms_model3 <- readRDS("./output/brms_model3.rds")
+neff_lowest(brms_temp_model1$fit)
 
-check_hmc_diagnostics(brms_model3$fit)
+rhat_highest(brms_temp_model1$fit)
 
-neff_lowest(brms_model3$fit)
+summary(brms_temp_model1)
 
-rhat_highest(brms_model3$fit)
+bayes_R2(brms_temp_model1)
 
-summary(brms_model3)
+plot(conditional_smooths(brms_temp_model1), ask = FALSE)
 
-bayes_R2(brms_model3)
+## lag 4_3 ##
 
-plot(conditional_smooths(brms_model3), ask = FALSE)
+# ph version
+ph_form2 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3)
 
+## fit ph
+brms_ph_model2 <- brm(ph_form2,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-######
+saveRDS(brms_ph_model2, file = "./output/brms_ph_model2.rds")
 
-######
-## fit brms version of model 4
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2, k = 4) + ar(time = year, p = 1, cov = TRUE))
+brms_ph_model2 <- readRDS("./output/brms_ph_model2.rds")
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+check_hmc_diagnostics(brms_ph_model2$fit)
 
+neff_lowest(brms_ph_model2$fit)
 
+rhat_highest(brms_ph_model2$fit)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model4 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+summary(brms_ph_model2)
 
-saveRDS(brms_model4, file = "./output/brms_model4.rds")
+bayes_R2(brms_ph_model2)
 
-brms_model4 <- readRDS("./output/brms_model4.rds")
+plot(conditional_smooths(brms_ph_model2), ask = FALSE)
 
-check_hmc_diagnostics(brms_model4$fit)
 
-neff_lowest(brms_model4$fit)
+## fit temp
+temp_form2 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3)
 
-rhat_highest(brms_model4$fit)
+brms_temp_model2 <- brm(temp_form2,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-summary(brms_model4)
+saveRDS(brms_temp_model2, file = "./output/brms_temp_model2.rds")
 
-bayes_R2(brms_model4)
+brms_temp_model2 <- readRDS("./output/brms_temp_model2.rds")
 
-plot(conditional_smooths(brms_model4), ask = FALSE)
+check_hmc_diagnostics(brms_temp_model2$fit)
 
+neff_lowest(brms_temp_model2$fit)
 
-######
-######
-## fit brms version of model 5
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE))
+rhat_highest(brms_temp_model2$fit)
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+summary(brms_temp_model2)
 
+bayes_R2(brms_temp_model2)
 
+plot(conditional_smooths(brms_temp_model2), ask = FALSE)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model5 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+## lag 4_3_2
+# ph version
+ph_form3 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2)
 
-saveRDS(brms_model5, file = "./output/brms_model5.rds")
+## fit ph
+brms_ph_model3 <- brm(ph_form3,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-brms_model5 <- readRDS("./output/brms_model5.rds")
+saveRDS(brms_ph_model3, file = "./output/brms_ph_model3.rds")
 
-check_hmc_diagnostics(brms_model5$fit)
+brms_ph_model3 <- readRDS("./output/brms_ph_model3.rds")
 
-neff_lowest(brms_model5$fit)
+check_hmc_diagnostics(brms_ph_model3$fit)
 
-rhat_highest(brms_model5$fit)
+neff_lowest(brms_ph_model3$fit)
 
-summary(brms_model5)
+rhat_highest(brms_ph_model3$fit)
 
-bayes_R2(brms_model5)
+summary(brms_ph_model3)
 
-plot(conditional_smooths(brms_model5), ask = FALSE)
+bayes_R2(brms_ph_model3)
 
+plot(conditional_smooths(brms_ph_model3), ask = FALSE)
 
-######
 
+## fit temp
+temp_form3 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3_2, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3_2)
 
+brms_temp_model3 <- brm(temp_form3,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-## fit brms version of model 6
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE))
+saveRDS(brms_temp_model3, file = "./output/brms_temp_model3.rds")
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+brms_temp_model3 <- readRDS("./output/brms_temp_model3.rds")
 
+check_hmc_diagnostics(brms_temp_model3$fit)
 
+neff_lowest(brms_temp_model3$fit)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model6a <- brm(form,
-                   data = dat,
-                   seed = 99,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+rhat_highest(brms_temp_model3$fit)
 
-saveRDS(brms_model6a, file = "./output/brms_model6a.rds")
+summary(brms_temp_model3)
 
-brms_model6a <- readRDS("./output/brms_model6a.rds")
+bayes_R2(brms_temp_model3)
 
-check_hmc_diagnostics(brms_model6a$fit)
+plot(conditional_smooths(brms_temp_model3), ask = FALSE)
 
-neff_lowest(brms_model6a$fit)
+## lag 4_3_2_1
+# ph version
+ph_form4 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1)
 
-rhat_highest(brms_model6a$fit)
+## fit ph
+brms_ph_model4 <- brm(ph_form4,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-summary(brms_model6a)
+saveRDS(brms_ph_model4, file = "./output/brms_ph_model4.rds")
 
-bayes_R2(brms_model6a)
+brms_ph_model4 <- readRDS("./output/brms_ph_model4.rds")
 
-plot(conditional_smooths(brms_model6a), ask = FALSE)
+check_hmc_diagnostics(brms_ph_model4$fit)
 
-###############
-## fit version with sigma modeled on ph
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
+neff_lowest(brms_ph_model4$fit)
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+rhat_highest(brms_ph_model4$fit)
 
+summary(brms_ph_model4)
 
+bayes_R2(brms_ph_model4)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model6b <- brm(form,
-                   data = dat,
-                   seed = 999,
-                   # prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
+plot(conditional_smooths(brms_ph_model4), ask = FALSE)
 
-saveRDS(brms_model6b, file = "./output/brms_model6b.rds")
 
-brms_model6b <- readRDS("./output/brms_model6b.rds")
+## fit temp
+temp_form4 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3_2_1)
 
-check_hmc_diagnostics(brms_model6b$fit)
+brms_temp_model4 <- brm(temp_form4,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-neff_lowest(brms_model6b$fit)
+saveRDS(brms_temp_model4, file = "./output/brms_temp_model4.rds")
 
-rhat_highest(brms_model6b$fit)
+brms_temp_model4 <- readRDS("./output/brms_temp_model4.rds")
 
-summary(brms_model6b)
+check_hmc_diagnostics(brms_temp_model4$fit)
 
-bayes_R2(brms_model6b)
+neff_lowest(brms_temp_model4$fit)
 
-plot(conditional_smooths(brms_model6b), ask = FALSE)
-###############
-## fit version with sigma modeled on ph using smooth
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), 
-           sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
+rhat_highest(brms_temp_model4$fit)
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            # set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+summary(brms_temp_model4)
 
+bayes_R2(brms_temp_model4)
 
+plot(conditional_smooths(brms_temp_model4), ask = FALSE)
 
-## fit model with covariance in ar term --------------------------------------
-brms_model6c <- brm(form,
-                    data = dat,
-                    seed = 999,
-                    # prior = priors,
-                    cores = 4, chains = 4, iter = 3000,
-                    save_pars = save_pars(all = TRUE),
-                    control = list(adapt_delta = 0.999, max_treedepth = 10))
+## lag 4_3_2_1_0
+# ph version
+ph_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
 
-saveRDS(brms_model6c, file = "./output/brms_model6c.rds")
+## fit ph
+brms_ph_model5 <- brm(ph_form5,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-brms_model6c <- readRDS("./output/brms_model6c.rds")
+saveRDS(brms_ph_model5, file = "./output/brms_ph_model5.rds")
 
-check_hmc_diagnostics(brms_model6c$fit)
+brms_ph_model5 <- readRDS("./output/brms_ph_model5.rds")
 
-neff_lowest(brms_model6c$fit)
+check_hmc_diagnostics(brms_ph_model5$fit)
 
-rhat_highest(brms_model6c$fit)
+neff_lowest(brms_ph_model5$fit)
 
-summary(brms_model6c)
+rhat_highest(brms_ph_model5$fit)
 
-bayes_R2(brms_model6c)
+summary(brms_ph_model5)
 
-plot(conditional_smooths(brms_model6c), ask = FALSE)
+bayes_R2(brms_ph_model5)
 
-loo(brms6b, brms_model6c)
+plot(conditional_smooths(brms_ph_model5), ask = FALSE)
 
 
-###############
+## fit temp
+temp_form5 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3_2_1_0)
 
-## fit version with sigma modeled on ph using linear relationship, but year included as covariate instead of AR1 process
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + s(year, k = 4), 
-           sigma ~ BB_ph_lag4_3_2_1_0)
+brms_temp_model5 <- brm(temp_form5,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
 
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            # set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
+saveRDS(brms_temp_model5, file = "./output/brms_temp_model5.rds")
 
+brms_temp_model5 <- readRDS("./output/brms_temp_model5.rds")
 
+check_hmc_diagnostics(brms_temp_model5$fit)
 
-## fit model -----------------------------------
-brms_model6d <- brm(form,
-                    data = dat,
-                    seed = 999,
-                    # prior = priors,
-                    cores = 4, chains = 4, iter = 3000,
-                    save_pars = save_pars(all = TRUE),
-                    control = list(adapt_delta = 0.999, max_treedepth = 10))
+neff_lowest(brms_temp_model5$fit)
 
-saveRDS(brms_model6d, file = "./output/brms_model6d.rds")
+rhat_highest(brms_temp_model5$fit)
 
-brms_model6d <- readRDS("./output/brms_model6d.rds")
+summary(brms_temp_model5)
 
-check_hmc_diagnostics(brms_model6d$fit)
+bayes_R2(brms_temp_model5)
 
-neff_lowest(brms_model6d$fit)
+plot(conditional_smooths(brms_temp_model5), ask = FALSE)
 
-rhat_highest(brms_model6d$fit)
-
-summary(brms_model6d)
-
-bayes_R2(brms_model6d)
-
-plot(conditional_smooths(brms_model6d), ask = FALSE)
-
-loo(brms6b, brms_model6d)
-
-
-###############
-####
+#####################################
 # load all the model objects
 
-brms2 <- readRDS("./output/brms_model2.rds")
-brms3 <- readRDS("./output/brms_model3.rds")
-brms4 <- readRDS("./output/brms_model4.rds")
-brms5 <- readRDS("./output/brms_model5.rds")
-brms6a <- readRDS("./output/brms_model6a.rds")
-brms6b <- readRDS("./output/brms_model6b.rds")
-brms6c <- readRDS("./output/brms_model6c.rds")
-brms6d <- readRDS("./output/brms_model6d.rds")
+temp_brms1 <- readRDS("./output/brms_temp_model1.rds")
+temp_brms2 <- readRDS("./output/brms_temp_model2.rds")
+temp_brms3 <- readRDS("./output/brms_temp_model3.rds")
+temp_brms4 <- readRDS("./output/brms_temp_model4.rds")
+temp_brms5<- readRDS("./output/brms_temp_model5.rds")
 
-loo_compare <- loo(brms2, brms3, brms4, brms5, brms6a)
+ph_brms1 <- readRDS("./output/brms_ph_model1.rds")
+ph_brms2 <- readRDS("./output/brms_ph_model2.rds")
+ph_brms3 <- readRDS("./output/brms_ph_model3.rds")
+ph_brms4 <- readRDS("./output/brms_ph_model4.rds")
+ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 
-loo(brms6a, brms6b)
-
-loo(brms6b, brms6c)
-
-loo(brms6b, brms6d)
-
-
-str(loo_compare)
+loo_compare <- loo(temp_brms1, temp_brms2, temp_brms3, temp_brms4, temp_brms5,
+                   ph_brms1, ph_brms2, ph_brms3, ph_brms4, ph_brms5, moment_match = T)
 
 # save 
-saveRDS(loo_compare, "./output/brms_model_comparison.rds")
+saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
 
-loo_compare <- readRDS("./output/brms_model_comparison.rds")
+loo_compare <- readRDS("./output/ph_temp_brms_model_comparison.rds")
 
 plot <- as.data.frame(loo_compare$diffs) %>%
-  mutate(model_number = 1:5,
-         Age = c("1-5", "1", "1-4", "1-2", "1-3")) %>%
-  arrange(model_number)
+  mutate(Covariate = rep(c("pH", "Warming index"), each = 5), 
+           age_order = c(1,2,4,3,5,
+                       5,4,1,2,3),
+         Age = c("1-5", "1-4", "1-2", "1-3", "1",
+                 "1", "1-2", "1-5", "1-4", "1-3")) 
 
 # change se_diff = 0 to NA
 change <- plot$se_diff == 0
 plot$se_diff[change] <- NA
 
+# order ages for plot
+plot$Age <- reorder(plot$Age, plot$age_order)
 
-compare_plot <- ggplot(plot, aes(model_number, elpd_diff)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin = elpd_diff - 1.96*se_diff,
-                    ymax = elpd_diff + 1.96*se_diff)) +
-  scale_x_continuous(breaks = 1:5, labels = plot$Age) +
+# add difference from smallest looic value
+plot <- plot %>%
+  mutate(looic.diff = looic - min(looic))
+
+compare_plot <- ggplot(plot, aes(Age, looic.diff, color = Covariate, fill = Covariate)) +
+  geom_col(position = "dodge") +
   labs(x = "Age of modeled effect",
-       y = "ELPD difference")
+       y = "LOOIC difference") +
+  scale_fill_manual(values = cb[c(2,6)]) +
+  scale_color_manual(values = cb[c(2,6)])
 
-# really no difference, but model 6 nominally better
+compare_plot
 
+# and temp v. pH compare for each set of lags
+age_diff <- plot %>%
+  select(Covariate, Age, looic) %>%
+  pivot_wider(names_from = Covariate, 
+              values_from = looic) %>%
+  mutate(diff = `Warming index` - pH)
 
+age_diff
 
-loo(brms6, brms6b)
+# plot best models
+bayes_R2(ph_brms5)
+
+conditional_effects(ph_brms5)
+
+summary(ph_brms5)
 
 ## plot pH effect
 
 ## 95% CI
-ce1s_1 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_1 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_2 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms6b, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_3 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
 dat_ce <- ce1s_1$BB_ph_lag4_3_2_1_0
 
@@ -518,199 +492,68 @@ dat_ce[["lower_90"]] <- ce1s_2$BB_ph_lag4_3_2_1_0[["lower__"]]
 dat_ce[["upper_80"]] <- ce1s_3$BB_ph_lag4_3_2_1_0[["upper__"]]
 dat_ce[["lower_80"]] <- ce1s_3$BB_ph_lag4_3_2_1_0[["lower__"]]
 
+plot_dat <- dat %>%
+  mutate(year = str_sub(year, start = 3))
 
-
-g2 <- ggplot(dat_ce) +
+ph_model_plot <- ggplot(dat_ce) +
   aes(x = effect1__, y = estimate__) +
   geom_ribbon(aes(ymin = lower_95, ymax = upper_95), fill = "grey90") +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Bristol Bay mean pH, ages 1-5", y = "ln(R/S)") +
+  labs(x = "Mean pH, ages 1-5", y = "ln(R/S)") +
   theme_bw() + 
-  geom_text(data = dat, aes(x=BB_ph_lag4_3_2_1_0, y=log_R_S, label = year)) + 
+  geom_text(data = plot_dat, aes(x=BB_ph_lag4_3_2_1_0, y=log_R_S, label = year)) + 
   scale_x_reverse()
 
-print(g2)
+ph_model_plot
 
-ggsave("./figs/brms_model6b_pH_effect.png", width = 4.5, height = 3, units = 'in')
-
-## model selection in brms------------------
-
-# using the same formulation as for mgcv model selection above
-mod3 <- gam(log_R_S ~ s(BB_ph_lag4_3, k = 4), data = dat)
-
-mod4 <- gam(log_R_S ~ s(BB_ph_lag4_3_2, k = 4), data = dat)
-
-mod5 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1, k = 4), data = dat)
-
-mod6 <- gam(log_R_S ~ s(BB_ph_lag4_3_2_1_0, k = 4), data = dat)
-
-
-## fit brms version of model 3
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3, k = 4) + ar(time = year, p = 1, cov = TRUE))
-
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
-
-
-
-## fit model with covariance in ar term 
-brms_model3 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
-
-saveRDS(brms_model3, file = "./output/brms_model3.rds")
-
-## fit brms version of model 4
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2, k = 4) + ar(time = year, p = 1, cov = TRUE))
-
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
-
-
-
-## fit model with covariance in ar term 
-brms_model4 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
-
-saveRDS(brms_model4, file = "./output/brms_model4.rds")
-
-## fit brms version of model 5
-form <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE))
-
-priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
-            set_prior("student_t(3, 0, 3)", class = "b"),
-            set_prior("student_t(3, 0, 3)", class = "sds"),
-            set_prior("student_t(3, 0, 3)", class = "sigma"),
-            set_prior("normal(0, 0.5)", class = "ar"))
-
-
-
-## fit model with covariance in ar term 
-brms_model5 <- brm(form,
-                   data = dat,
-                   prior = priors,
-                   cores = 4, chains = 4, iter = 3000,
-                   save_pars = save_pars(all = TRUE),
-                   control = list(adapt_delta = 0.999, max_treedepth = 10))
-
-saveRDS(brms_model5, file = "./output/brms_model5.rds")
-
-## brms model selection ---------------------------------
-
-# load all the model objects
-
-brms2 <- readRDS("./output/brms_model2.rds")
-brms3 <- readRDS("./output/brms_model3.rds")
-brms4 <- readRDS("./output/brms_model4.rds")
-brms5 <- readRDS("./output/brms_model5.rds")
-brms6 <- readRDS("./output/brms_model6.rds")
-
-
-loo_compare <- loo(brms2, brms3, brms4, brms5, brms6)
-
-str(loo_compare)
-
-# save 
-saveRDS(loo_compare, "./output/brms_model_comparison.rds")
-
-loo_compare <- readRDS("./output/brms_model_comparison.rds")
-
-plot <- as.data.frame(loo_compare$diffs) %>%
-  mutate(model_number = 1:5,
-         Age = c("1-5", "1", "1-4", "1-2", "1-3")) %>%
-  arrange(model_number)
-
-# change se_diff = 0 to NA
-change <- plot$se_diff == 0
-plot$se_diff[change] <- NA
-
-
-compare_plot <- ggplot(plot, aes(model_number, elpd_diff)) +
-  geom_point() +
-  geom_line() +
-  geom_errorbar(aes(ymin = elpd_diff - 1.96*se_diff,
-                    ymax = elpd_diff + 1.96*se_diff)) +
-  scale_x_continuous(breaks = 1:5, labels = plot$Age) +
-  labs(x = "Age of modeled effect",
-       y = "ELPD difference")
-
-# combine with g2 (best model)
-
-png("./figs/model_selection_best_model_plot.png", width = 9.5, height = 4, units = 'in', res = 300)
-
-ggpubr::ggarrange(compare_plot, g2, ncol = 2, widths = c(0.45, 0.55), labels = "auto")
-
-dev.off()
-
-## plot least-supported model -------------------------
-
-brms_model4 <- readRDS("./output/brms_model4.rds")
-
-check_hmc_diagnostics(brms_model4$fit)
-
-neff_lowest(brms_model4$fit)
-
-rhat_highest(brms_model4$fit)
-
-summary(brms_model4)
-
-bayes_R2(brms_model6)
-
-## plot 
-
-# pH effect
-
+## plot temp effect
+bayes_R2(temp_brms1)
 ## 95% CI
-ce1s_1 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+ce1s_1 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+ce1s_2 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms_model4, effect = "BB_ph_lag4_3_2", re_formula = NA,
+ce1s_3 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.8)
-dat_ce <- ce1s_1$BB_ph_lag4_3_2
+dat_ce <- ce1s_1$temp_index_lag4
 
 #########################
 
 dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
 dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
-dat_ce[["upper_90"]] <- ce1s_2$BB_ph_lag4_3_2[["upper__"]]
-dat_ce[["lower_90"]] <- ce1s_2$BB_ph_lag4_3_2[["lower__"]]
-dat_ce[["upper_80"]] <- ce1s_3$BB_ph_lag4_3_2[["upper__"]]
-dat_ce[["lower_80"]] <- ce1s_3$BB_ph_lag4_3_2[["lower__"]]
+dat_ce[["upper_90"]] <- ce1s_2$temp_index_lag4[["upper__"]]
+dat_ce[["lower_90"]] <- ce1s_2$temp_index_lag4[["lower__"]]
+dat_ce[["upper_80"]] <- ce1s_3$temp_index_lag4[["upper__"]]
+dat_ce[["lower_80"]] <- ce1s_3$temp_index_lag4[["lower__"]]
 
 
-
-g_mod4 <- ggplot(dat_ce) +
+temp_model_plot <- ggplot(dat_ce) +
   aes(x = effect1__, y = estimate__) +
   geom_ribbon(aes(ymin = lower_95, ymax = upper_95), fill = "grey90") +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Bristol Bay mean pH, ages 1-3", y = "ln(R/S)") +
+  labs(x = "Temperature index, age 1", y = "ln(R/S)") +
   theme_bw() + 
-  geom_text(data = dat, aes(x=BB_ph_lag4_3_2, y=log_R_S, label = year)) + 
-  scale_x_reverse()
+  geom_text(data = plot_dat, aes(x=temp_index_lag4, y=log_R_S, label = year))
 
-print(g_mod4)
+temp_model_plot
 
-ggsave("./figs/brms_model6_pH_effect.png", width = 4.5, height = 3, units = 'in')
+
+##
+png("./figs/fig2.png", width = 5, height = 10, units = 'in', res = 300)
+
+ggpubr::ggarrange(compare_plot, ph_model_plot, temp_model_plot, 
+                  ncol = 1,
+                  labels = "auto")
+
+dev.off()
+
+
 
 ## plot time series ------------------
 
