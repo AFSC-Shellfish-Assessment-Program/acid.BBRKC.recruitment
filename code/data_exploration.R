@@ -426,6 +426,8 @@ loo_compare <- loo(temp_brms1, temp_brms2, temp_brms3, temp_brms4, temp_brms5,
 saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
 
 ## compare with a model invoking pH and temperature ------------------------
+cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
+
 
 both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4_3_2_1_0, k = 4) + 
                    ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
