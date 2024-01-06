@@ -96,9 +96,6 @@ dat <- rdat %>%
 dat <- left_join(dat, ph_dat) %>%
   left_join(., temp_dat)
 
-# # remove 2022 for now (no ph estimates)
-# dat <- dat %>%
-#   filter(year <= 2021)
 
 ggplot(dat, aes(lag5_S, log_R_S)) +
   geom_point() +
@@ -462,6 +459,14 @@ compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
 
 compare$ic_diffs
 
+## finally, fit best model to 2000-2022 data-----------
+
+
+
+
+
+###############
+
 
 
 ###############
@@ -513,16 +518,16 @@ conditional_effects(ph_brms5)
 
 summary(ph_brms5)
 
-## plot pH effect
+## plot both effect
 
 ## 95% CI
-ce1s_1 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_1 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_2 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_3 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
 dat_ce <- ce1s_1$BB_ph_lag4_3_2_1_0
 
@@ -552,27 +557,29 @@ ph_model_plot <- ggplot(dat_ce) +
 ph_model_plot
 
 ## plot temp effect
-bayes_R2(temp_brms1)
 ## 95% CI
-ce1s_1 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
+ce1s_1 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
+ce1s_2 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
+ce1s_3 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
-dat_ce <- ce1s_1$temp_index_lag4
+
+dat_ce <- ce1s_1$temp_index_lag4_3_2_1_0
 
 #########################
 
 dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
 dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
-dat_ce[["upper_90"]] <- ce1s_2$temp_index_lag4[["upper__"]]
-dat_ce[["lower_90"]] <- ce1s_2$temp_index_lag4[["lower__"]]
-dat_ce[["upper_80"]] <- ce1s_3$temp_index_lag4[["upper__"]]
-dat_ce[["lower_80"]] <- ce1s_3$temp_index_lag4[["lower__"]]
+dat_ce[["upper_90"]] <- ce1s_2$temp_index_lag4_3_2_1_0[["upper__"]]
+dat_ce[["lower_90"]] <- ce1s_2$temp_index_lag4_3_2_1_0[["lower__"]]
+dat_ce[["upper_80"]] <- ce1s_3$temp_index_lag4_3_2_1_0[["upper__"]]
+dat_ce[["lower_80"]] <- ce1s_3$temp_index_lag4_3_2_1_0[["lower__"]]
 
+plot_dat <- dat %>%
+  mutate(year = str_sub(year, start = 3))
 
 temp_model_plot <- ggplot(dat_ce) +
   aes(x = effect1__, y = estimate__) +
@@ -580,9 +587,10 @@ temp_model_plot <- ggplot(dat_ce) +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Temperature index, age 1", y = "ln(R/S)") +
+  labs(x = "Mean temperature index, ages 1-5", y = "ln(R/S)") +
   theme_bw() + 
-  geom_text(data = plot_dat, aes(x=temp_index_lag4, y=log_R_S, label = year))
+  geom_text(data = plot_dat, aes(x=temp_index_lag4_3_2_1_0, y=log_R_S, label = year)) + 
+  scale_x_reverse()
 
 temp_model_plot
 
