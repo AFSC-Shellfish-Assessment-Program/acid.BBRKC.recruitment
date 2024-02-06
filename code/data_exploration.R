@@ -1,4 +1,4 @@
-# evaluate pH - recruitment  and temperarture-recruitment relationships
+# evaluate pH - recruitment  and temperature-recruitment relationships
 
 library(tidyverse)
 library(mgcv)
@@ -426,8 +426,8 @@ saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
 cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
 
 
-both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4_3_2_1_0, k = 4) + 
-                   ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
+both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4, k = 4) + 
+                   ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0 + temp_index_lag4)
 
 ## fit model
 brms_both_model5 <- brm(both_form5,
@@ -459,8 +459,40 @@ compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
 
 compare$ic_diffs
 
-## finally, fit best model to 2000-2022 data-----------
+## finally, fit pH model to 2000-2022 data-----------
 
+ph_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 3) + # reducing k to 3 to avoid over-fitting
+                   ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
+
+## fit model
+brms_ph_model5_2000 <- brm(ph_form5,
+                        data = filter(dat, year >= 2000),
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model5_2000, file = "./output/brms_ph_model5_2000.rds")
+
+brms_ph_model5_2000 <- readRDS("./output/brms_ph_model5_2000.rds")
+
+check_hmc_diagnostics(brms_ph_model5_2000$fit)
+
+neff_lowest(brms_ph_model5_2000$fit)
+
+rhat_highest(brms_ph_model5_2000$fit)
+
+summary(brms_ph_model5_2000)
+
+bayes_R2(brms_ph_model5_2000)
+
+plot(conditional_smooths(brms_ph_model5_2000), ask = FALSE)
+
+ph_brms5<- readRDS("./output/brms_ph_model5.rds")
+
+compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
+
+compare$ic_diffs
 
 
 
@@ -521,13 +553,13 @@ summary(ph_brms5)
 ## plot both effect
 
 ## 95% CI
-ce1s_1 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_1 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_2 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms_both_model5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
+ce1s_3 <- conditional_effects(ph_brms5, effect = "BB_ph_lag4_3_2_1_0", re_formula = NA,
                               prob = 0.8)
 dat_ce <- ce1s_1$BB_ph_lag4_3_2_1_0
 
@@ -557,26 +589,27 @@ ph_model_plot <- ggplot(dat_ce) +
 ph_model_plot
 
 ## plot temp effect
+temp_brms1 <- readRDS("./output/brms_temp_model1.rds")
 ## 95% CI
-ce1s_1 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
+ce1s_1 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.95)
 ## 90% CI
-ce1s_2 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
+ce1s_2 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.9)
 ## 80% CI
-ce1s_3 <- conditional_effects(brms_both_model5, effect = "temp_index_lag4_3_2_1_0", re_formula = NA,
+ce1s_3 <- conditional_effects(temp_brms1, effect = "temp_index_lag4", re_formula = NA,
                               prob = 0.8)
 
-dat_ce <- ce1s_1$temp_index_lag4_3_2_1_0
+dat_ce <- ce1s_1$temp_index_lag4
 
 #########################
 
 dat_ce[["upper_95"]] <- dat_ce[["upper__"]]
 dat_ce[["lower_95"]] <- dat_ce[["lower__"]]
-dat_ce[["upper_90"]] <- ce1s_2$temp_index_lag4_3_2_1_0[["upper__"]]
-dat_ce[["lower_90"]] <- ce1s_2$temp_index_lag4_3_2_1_0[["lower__"]]
-dat_ce[["upper_80"]] <- ce1s_3$temp_index_lag4_3_2_1_0[["upper__"]]
-dat_ce[["lower_80"]] <- ce1s_3$temp_index_lag4_3_2_1_0[["lower__"]]
+dat_ce[["upper_90"]] <- ce1s_2$temp_index_lag4[["upper__"]]
+dat_ce[["lower_90"]] <- ce1s_2$temp_index_lag4[["lower__"]]
+dat_ce[["upper_80"]] <- ce1s_3$temp_index_lag4[["upper__"]]
+dat_ce[["lower_80"]] <- ce1s_3$temp_index_lag4[["lower__"]]
 
 plot_dat <- dat %>%
   mutate(year = str_sub(year, start = 3))
@@ -587,10 +620,9 @@ temp_model_plot <- ggplot(dat_ce) +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Mean temperature index, ages 1-5", y = "ln(R/S)") +
+  labs(x = "Mean temperature index, age 1", y = "ln(R/S)") +
   theme_bw() + 
-  geom_text(data = plot_dat, aes(x=temp_index_lag4_3_2_1_0, y=log_R_S, label = year)) + 
-  scale_x_reverse()
+  geom_text(data = plot_dat, aes(x=temp_index_lag4_3_2_1_0, y=log_R_S, label = year)) 
 
 temp_model_plot
 
