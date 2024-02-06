@@ -425,6 +425,10 @@ mean_scaled_sst <- data.frame(year = 1975:2022,
     
     sum(check) # 131 missing
     
+    # % missing
+    sum(check) / (48*length(unique(use.dat$station)))
+    
+    
     # examine correlations
     # r <- rcorr(as.matrix(dat.julian))$r 
     
