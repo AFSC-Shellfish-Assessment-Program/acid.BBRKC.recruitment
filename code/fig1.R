@@ -42,7 +42,13 @@ ph_plot <- ggplot(filter(ph_dat, year >= 1975), aes(year, BB_pH)) +
 
 ph_plot
 
-R.S_plot <- ggplot(filter(dat, year >= 1975), aes(year, log_R_S)) +
+plot_recr <- plot_rkc %>%
+  pivot_wider(names_from = name, values_from = value) %>%
+  mutate(`Mature females` = lag(`Mature females`, 5),
+         log_R_S = log(Recruits/`Mature females`))
+  
+
+R.S_plot <- ggplot(filter(plot_recr, year >= 1980), aes(year, log_R_S)) +
   geom_point() +
   geom_line() +
   theme(axis.title.x = element_blank()) +
