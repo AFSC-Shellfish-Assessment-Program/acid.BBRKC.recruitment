@@ -71,7 +71,9 @@ ice_plot <- ggplot(ice, aes(year, `Ice concentration`, color = name)) +
   geom_line() +
   scale_color_manual(values = cb[c(2,4)]) +
   theme(legend.title = element_blank(),
-        legend.position = c(0.4, 0.85),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.margin = margin(t = -1, r = 0, b = -1, l = 0, unit = "pt"),
         axis.title.x = element_blank())
 
 ice_plot
@@ -88,7 +90,9 @@ temp_plot <- ggplot(temp, aes(year, `Temperature (°C)`, color = name)) +
   geom_line() +
   scale_color_manual(values = cb[c(6,7)]) +
   theme(legend.title = element_blank(),
-        legend.position = c(0.45, 0.85),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.margin = margin(t = -1, r = 0, b = -1, l = 0, unit = "pt"),
         axis.title.x = element_blank())
 
 
@@ -101,7 +105,15 @@ trend <- read.csv("./Output/dfa_trend.csv")
 
 dodge <- position_dodge(width=0.9)
 
+# clean up names
+plot.CI$names <- c("June bot. temp.", 
+                   "Jan-Feb ice",
+                   "Mar-Apr ice",
+                   "Jan-Jun SST")
+
 plot.CI$names <- reorder(plot.CI$names, plot.CI$mean)
+
+
 
 loadings.plot <- ggplot(plot.CI, aes(x=names, y=mean)) +
   geom_bar(position=dodge, stat="identity", fill=cb[6]) +
@@ -128,3 +140,4 @@ ggarrange(void.plot, crab_plot, R.S_plot, ph_plot, ice_plot, temp_plot, loadings
           labels = "auto")
 
 dev.off()
+
