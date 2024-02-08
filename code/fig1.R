@@ -2,6 +2,9 @@
 
 library(tidyverse)
 library(ggpubr)
+library(terra)
+library(rgdal)
+library(sf)
 
 theme_set(theme_bw())
 
@@ -130,14 +133,65 @@ trend.plot <- ggplot(trend, aes(t, estimate)) +
   geom_point(color=cb[6]) +
   geom_ribbon(aes(x=t, ymin=conf.low, ymax=conf.high), linetype=2, alpha=0.1, fill=cb[6]) + xlab("") + ylab("Temperature index")
 
+# Bristol Bay map
+  map.crs <- "EPSG:3338" # mapping crs
+  crs.latlon <- "epsg:4326" #lat lon crs
+  
+  region_layers <- akgfmaps::get_base_layers(select.region = "bs.south", set.crs=map.crs) # get AK base layers
+  surv_area <- region_layers$survey.area %>% vect() # load survey area
+  
+  survey_gdb<- "./Data/SAP_layers.gdb" # set gdb to get survey strata
+  
+  readOGR(dsn=survey_gdb,layer="BristolBaySurveyStrata") %>%
+    vect(crs = crs.latlon) %>%
+    terra::project(map.crs) -> BB_strata # load BB survey strata
+  
+  # Set up plot boundary
+  plot.boundary.untrans <- data.frame(y = c(52.75, 66),
+                                      x = c(-178, -155)) # plot boundary unprojected
+  
+  plot.boundary <- plot.boundary.untrans %>%
+    sf::st_as_sf(coords = c(x = "x", y = "y"), crs = sf::st_crs(4326)) %>%
+    sf::st_transform(crs = map.crs) %>%
+    sf::st_coordinates() %>%
+    as.data.frame() %>%
+    dplyr::rename(x = X, y = Y) # plot boundary projected
+  
+  # And map
+  ggplot2::ggplot() +
+    #ggplot2::geom_sf(data = survey.sf, fill = "grey95")+
+    ggplot2::geom_sf(data = st_as_sf(BB_strata),
+                     fill = "#deeaf6",
+                     color = "black",
+                     linewidth = 0.25)+
+    ggplot2::geom_sf(data = region_layers$akland,
+                     fill = "grey70",
+                     color = "black",
+                     linewidth = 0.15)+
+    geom_sf(data = region_layers$bathymetry, color=alpha("grey70")) +
+    coord_sf(xlim = plot.boundary$x,
+             ylim = plot.boundary$y)+
+    scale_x_continuous(breaks = region_layers$lon.breaks) + 
+    scale_y_continuous(breaks = region_layers$lat.breaks) +
+    ggplot2::theme_bw() +
+    ggplot2:: theme(
+      panel.border = ggplot2::element_rect(color = "black", fill = NA),
+      panel.background = ggplot2::element_rect(fill = NA, color = "black"),
+      #legend.position = legend.pos,
+      panel.grid.major = element_blank(),
+      axis.title = ggplot2::element_blank(), axis.text = ggplot2::element_text(size = 10),
+      plot.background = ggplot2::element_rect(fill = "white", color = "white")) -> BB_map
+
+
 # and combine
-void.plot <- ggplot() + theme_void()
+# void.plot <- ggplot() + theme_void()
+# 
+# png("./figs/fig1.png", width = 8, height = 10, units = 'in', res = 300)
 
-png("./figs/fig1.png", width = 8, height = 10, units = 'in', res = 300)
-
-ggarrange(void.plot, crab_plot, R.S_plot, ph_plot, ice_plot, temp_plot, loadings.plot, trend.plot,
+ggarrange(BB_map, crab_plot, R.S_plot, ph_plot, ice_plot, temp_plot, loadings.plot, trend.plot,
           ncol = 2, nrow = 4,
           labels = "auto")
 
+ggsave("./figs/fig1.combined.png", width = 8, height = 10, units = 'in')
 dev.off()
 
