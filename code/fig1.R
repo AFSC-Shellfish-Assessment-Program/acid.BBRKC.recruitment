@@ -192,6 +192,6 @@ ggarrange(BB_map, crab_plot, R.S_plot, ph_plot, ice_plot, temp_plot, loadings.pl
           ncol = 2, nrow = 4,
           labels = "auto")
 
-ggsave("./figs/fig1.combined.png", width = 8, height = 10, units = 'in')
+ggsave("./figs/fig1.png", width = 8, height = 10, units = 'in')
 dev.off()
 
