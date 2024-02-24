@@ -724,3 +724,46 @@ dev.off()
 # and save loadings and trend
 write.csv(plot.CI, "./Output/dfa_loadings.csv", row.names = F)
 write.csv(trend, "./Output/dfa_trend.csv", row.names = F)
+
+## plot predicted / observed values
+
+DFA_pred <- print(predict(mod)) %>%
+  mutate(year = rep(1975:2022, 4))
+
+ggplot(DFA_pred, aes(estimate, y)) +
+  geom_text(aes(label = year)) +
+  geom_smooth(method = "lm", se = F) +
+  facet_wrap(~.rownames, ncol = 2, scale = "free") +
+  labs(x = "Estimated", y = "Observed")
+
+
+## plot regressions of bottom temp vs other three 
+
+raw_dat <- read.csv("./data/sst_temp_original_units.csv") %>%
+  pivot_longer(cols = c(-year, -June_bottom_temp))
+
+ggplot(raw_dat, aes(value, June_bottom_temp)) +
+  facet_wrap(~name, scales = "free_x") +
+  geom_text(aes(label = year)) +
+  geom_smooth(method = "l,", se = F)
+ # that doesn't look bad - it looks like the March_Apr ice is the best predictor, and explains the poor
+ # fit for Jan_Jun_SST
+
+## fit as a GAM and examine residuals
+
+raw_dat <- read.csv("./data/sst_temp_original_units.csv")
+
+mod <- gam(June_bottom_temp ~ s(Jan_Feb_plot_ice, k = 4) + s(Mar_Apr_plot_ice, k = 4) + s(Jan_Jun_SST, k = 4),
+           data = raw_dat)
+
+summary(mod)
+
+raw_dat <- na.omit(raw_dat)
+
+raw_dat$resid <- resid(mod) 
+
+ggplot(raw_dat, aes(year, resid)) +
+  geom_point() +
+  geom_line()
+
+# some pattern there!
