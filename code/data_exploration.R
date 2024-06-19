@@ -534,6 +534,7 @@ compare_plot <- ggplot(plot, aes(Age, looic.diff, color = Covariate, fill = Cova
 
 compare_plot
 
+
 # and temp v. pH compare for each set of lags
 age_diff <- plot %>%
   select(Covariate, Age, looic) %>%
@@ -620,7 +621,7 @@ temp_model_plot <- ggplot(dat_ce) +
   geom_ribbon(aes(ymin = lower_90, ymax = upper_90), fill = "grey85") +
   geom_ribbon(aes(ymin = lower_80, ymax = upper_80), fill = "grey80") +
   geom_line(size = 1.5, color = "red3") +
-  labs(x = "Mean temperature index, age 1", y = "ln(R/S)") +
+  labs(x = "Temperature index, age 1", y = "ln(R/S)") +
   theme_bw() + 
   geom_text(data = plot_dat, aes(x=temp_index_lag4_3_2_1_0, y=log_R_S, label = year)) 
 
