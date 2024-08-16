@@ -400,6 +400,39 @@ qqline(residuals, col = "steelblue", lwd = 2)
 
 launch_shinystan(brms_ph_model5)
 
+## compare with model fitting smooth to sigma ~ pH relationship
+ph_form5b <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
+
+## fit ph
+brms_ph_model5b <- brm(ph_form5b,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model5b, file = "./output/brms_ph_model5_smooth_sigma.rds")
+
+brms_ph_model5b <- readRDS("./output/brms_ph_model5_smooth_sigma.rds")
+
+check_hmc_diagnostics(brms_ph_model5b$fit)
+
+neff_lowest(brms_ph_model5b$fit)
+
+rhat_highest(brms_ph_model5b$fit)
+
+summary(brms_ph_model5b)
+
+bayes_R2(brms_ph_model5b)
+
+plot(conditional_smooths(brms_ph_model5b), ask = FALSE)
+
+# compare models
+brms_ph_model5 <- readRDS("./output/brms_ph_model5.rds")
+
+loo(brms_ph_model5, brms_ph_model5b, moment_match = T) # no advantage to fitting a smooth!
+
+
 ## fit temp
 temp_form5 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3_2_1_0)
 
