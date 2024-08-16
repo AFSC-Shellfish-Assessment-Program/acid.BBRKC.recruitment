@@ -6,6 +6,11 @@ library(mgcv)
 library(rstan)
 library(brms)
 library(bayesplot)
+
+library(shinystan)
+
+library(xfun)
+
 source("./code/stan_utils.R")
 
 theme_set(theme_bw())
@@ -374,6 +379,26 @@ bayes_R2(brms_ph_model5)
 
 plot(conditional_smooths(brms_ph_model5), ask = FALSE)
 
+# residual time series for this model
+residuals <- as.data.frame(resid(brms_ph_model5)) %>%
+  mutate(year = 1980:2022,
+         log_R_S = dat$log_R_S[dat$year %in% 1980:2022])
+
+ggplot(residuals, aes(year, Estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Q2.5, ymax = Q97.5))
+
+ggplot(residuals, aes(log_R_S, Estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Q2.5, ymax = Q97.5))
+
+residuals <- residuals(brms_ph_model5)
+
+# Create a QQ plot
+qqnorm(residuals, pch = 1, frame = FALSE)
+qqline(residuals, col = "steelblue", lwd = 2)
+
+launch_shinystan(brms_ph_model5)
 
 ## fit temp
 temp_form5 <- bf(log_R_S ~ 1 + s(temp_index_lag4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag4_3_2_1_0)
@@ -424,10 +449,10 @@ saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
 
 ## compare with a model invoking pH and temperature ------------------------
 cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
-
+cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4, use = "p") # r = -0.28
 
 both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4, k = 4) + 
-                   ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0 + temp_index_lag4)
+                   ar(time = year, p = 1, cov = TRUE), sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
 
 ## fit model
 brms_both_model5 <- brm(both_form5,
@@ -458,6 +483,41 @@ ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
 
 compare$ic_diffs
+
+# residual time series for this model
+residuals <- as.data.frame(resid(brms_both_model5)) %>%
+  mutate(year = 1980:2022,
+         log_R_S = dat$log_R_S[dat$year %in% 1980:2022])
+
+ggplot(residuals, aes(Estimate)) +
+  geom_histogram(bins = 12, fill = "grey", color = "black")
+
+
+
+ggplot(residuals, aes(year, Estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Q2.5, ymax = Q97.5))
+
+ggplot(residuals, aes(year, abs(Estimate))) +
+  geom_point() 
+
+ggplot(residuals, aes(log_R_S, Estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Q2.5, ymax = Q97.5))
+
+residuals <- residuals(brms_both_model5)
+
+# Create a QQ plot
+qqnorm(residuals, pch = 1, frame = FALSE)
+qqline(residuals, col = "steelblue", lwd = 2)
+
+# set up vector of y for model evaluation 
+y_both <- dat$log_R_S[dat$year %in% 1980:2022]
+
+launch_shinystan(brms_both_model5)
+
+## model with best lag for each covariate --------------------
+
 
 ## finally, fit pH model to 2000-2022 data-----------
 
