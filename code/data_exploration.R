@@ -581,7 +581,28 @@ brms_both_model5 <- readRDS("./output/brms_both_model5.rds")
 
 loo(brms_both_model5, brms_both_model5b, moment_match = T) # fitting a smooth is worse!
 
-## model with best lag for each covariate --------------------
+# compare qq plots
+residuals <- residuals(brms_both_model5)
+
+# Create a QQ plot
+qqnorm(residuals, pch = 1, frame = FALSE)
+qqline(residuals, col = "steelblue", lwd = 2)
+
+
+residuals <- residuals(brms_both_model5b)
+
+# Create a QQ plot
+qqnorm(residuals, pch = 1, frame = FALSE)
+qqline(residuals, col = "steelblue", lwd = 2)
+
+# the two are nearly identical
+
+# one more model comparison - combined model v. best ph-only model
+ph_brms5<- readRDS("./output/brms_ph_model5.rds")
+
+loo(ph_brms5, brms_both_model5, moment_match = T) # elpd_diff = -0.6, se_diff = 1.0
+# no support for the model invoking both
+
 
 
 ## finally, fit pH model to 2000-2022 data-----------
