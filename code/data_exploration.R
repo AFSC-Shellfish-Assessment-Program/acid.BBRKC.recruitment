@@ -485,7 +485,7 @@ cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
 cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4, use = "p") # r = -0.28
 
 both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4, k = 4) + 
-                   ar(time = year, p = 1, cov = TRUE), sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
+                   ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
 
 ## fit model
 brms_both_model5 <- brm(both_form5,
@@ -548,6 +548,38 @@ qqline(residuals, col = "steelblue", lwd = 2)
 y_both <- dat$log_R_S[dat$year %in% 1980:2022]
 
 launch_shinystan(brms_both_model5)
+
+## compare with model fitting smooth to sigma ~ pH relationship
+both_form5b <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4, k = 4) + 
+                    ar(time = year, p = 1, cov = TRUE), sigma ~ s(BB_ph_lag4_3_2_1_0, k = 4))
+## fit 
+brms_both_model5b <- brm(both_form5b,
+                       data = dat,
+                       prior = priors,
+                       cores = 4, chains = 4, iter = 2000,
+                       save_pars = save_pars(all = TRUE),
+                       control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_both_model5b, file = "./output/brms_both_model5_smooth_sigma.rds")
+
+brms_both_model5b <- readRDS("./output/brms_both_model5_smooth_sigma.rds")
+
+check_hmc_diagnostics(brms_both_model5b$fit)
+
+neff_lowest(brms_both_model5b$fit)
+
+rhat_highest(brms_both_model5b$fit)
+
+summary(brms_both_model5b)
+
+bayes_R2(brms_both_model5b)
+
+plot(conditional_smooths(brms_both_model5b), ask = FALSE)
+
+# compare models
+brms_both_model5 <- readRDS("./output/brms_both_model5.rds")
+
+loo(brms_both_model5, brms_both_model5b, moment_match = T) # fitting a smooth is worse!
 
 ## model with best lag for each covariate --------------------
 
