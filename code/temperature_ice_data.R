@@ -120,22 +120,54 @@ cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E
       mutate(month = rep(m4, 3333), year = rep(yr4, 3333), ice = ice) %>%
       na.omit()-> ice_latlon22
   
-  #bind with earlier ice data, filter by Jan-Apr and subset to BB extent, calculate mean by month
-  rbind(ice_latlon_70.74, ice_latlon, ice_latlon22) %>%
+    #2022 data
+    nc4_23 <- nc_open("./data/ERA5_ice_sst_2023.nc")
+    
+    ice23 <- ncvar_get(nc4_23, "siconc", verbose = F)
+    
+    ice23 <- ifelse(ice23<0.0005, 0, ice23)
+    dim(ice23) #101 lon, 33 lat, 12 months
+    
+    #Process
+    h <- (ncvar_get(nc4_23, "time")/24)
+    d4 <- dates(h, origin = c(1, 1, 1900))  
+    m4 <- months(d4)
+    yr4 <- chron::years(d4)
+    
+    x4 <- ncvar_get(nc4_23, "longitude")
+    y4 <- ncvar_get(nc4_23, "latitude")
+    
+    # Keep track of corresponding latitudes and longitudes of each column:
+    lat <- rep(y4, length(x4))
+    lon <- rep(x4, each = length(y4))
+    
+    
+    #Create ice data matrix
+    ice23 <- aperm(ice23, 3:1)
+    mat_ice23 <- t(matrix(ice23, nrow = dim(ice23)[1], ncol = prod(dim(ice23)[2:3])))
+    
+    data.frame(lon = lon, lat = lat,  mat_ice23) %>%
+      pivot_longer(cols = c(3:14), names_to = "month", values_to = "ice") %>%
+      mutate(month = rep(m4, 3333), year = rep(yr4, 3333), ice = ice) %>%
+      na.omit()-> ice_latlon23
+    
+    
+#bind with earlier ice data, filter by Jan-Apr and subset to BB extent, calculate mean by month
+  rbind(ice_latlon_70.74, ice_latlon, ice_latlon22, ice_latlon23) %>%
     filter(lon >= -168 & lon <= -158, lat >= 54 & lat <= 60, month %in% c("Jan", "Feb", "Mar", "Apr")) %>%
     group_by(year, month) %>%
-    reframe(mean.ice = mean(ice)) -> ice_JanApr_1970.2022
+    reframe(mean.ice = mean(ice)) -> ice_JanApr_1970.2023
 
   #write csv
-  write.csv(ice_JanApr_1970.2022, "./output/ERA5ice_JanApr_1970.2022.csv")
+  write.csv(ice_JanApr_1970.2023, "./output/ERA5ice_JanApr_1970.2023.csv")
   
-  ice <- ice_JanApr_1970.2022 %>%
+  ice <- ice_JanApr_1970.2023 %>%
     mutate(year = as.numeric(as.character(year)),
            month = as.factor(as.character(month)),
            mean.ice = as.numeric(mean.ice)) %>%
     pivot_wider(names_from = month,
                 values_from = mean.ice) %>%
-    filter(year %in% 1975:2022)
+    filter(year %in% 1975:2023)
 
   # save raw data for plot
   plot_ice <- ice
@@ -213,6 +245,8 @@ ice <- ice %>%
       na.omit()-> sst_latlon
 
   #2022 data
+    nc4_22 <- nc_open("./data/ERA5_ice_sst_2022.nc")
+    
     sst22 <- ncvar_get(nc4_22, "sst", verbose = F) 
     
     dim(sst22) #101 lon, 33 lat, 2 months
@@ -239,20 +273,51 @@ ice <- ice %>%
       mutate(month = rep(m4, 3333), year = rep(yr4, 3333), sst = sst) %>%
       na.omit()-> sst_latlon22
     
-  #bind with earlier sst data, subset to BB extent, calculate mean by month, change K to C
-    rbind(sst_latlon_70.74, sst_latlon, sst_latlon22) %>%
+  
+    #2023 data
+    nc4_23 <- nc_open("./data/ERA5_ice_sst_2023.nc")
+    
+    sst23 <- ncvar_get(nc4_23, "sst", verbose = F) 
+    
+    dim(sst23) #101 lon, 33 lat, 2 months
+    
+    #Process
+    h <- (ncvar_get(nc4_23, "time")/24)
+    d4 <- dates(h, origin = c(1, 1, 1900))  
+    m4 <- months(d4)
+    yr4 <- chron::years(d4)
+    
+    x4 <- ncvar_get(nc4_23, "longitude")
+    y4 <- ncvar_get(nc4_23, "latitude")
+    
+    # Keep track of corresponding latitudes and longitudes of each column:
+    lat <- rep(y4, length(x4))
+    lon <- rep(x4, each = length(y4))
+    
+    #Create sst data matrix
+    sst23 <- aperm(sst23, 3:1)
+    mat_sst23 <- t(matrix(sst23, nrow = dim(sst23)[1], ncol = prod(dim(sst23)[2:3])))
+    
+    data.frame(lon = lon, lat = lat,  mat_sst23) %>%
+      pivot_longer(cols = c(3:14), names_to = "month", values_to = "sst") %>%
+      mutate(month = rep(m4, 3333), year = rep(yr4, 3333), sst = sst) %>%
+      na.omit()-> sst_latlon23   
+    
+    
+    #bind with earlier sst data, subset to BB extent, calculate mean by month, change K to C
+    rbind(sst_latlon_70.74, sst_latlon, sst_latlon22, sst_latlon23) %>%
       filter(lon >= -168 & lon <= -158, lat >= 54 & lat <= 60) %>%
       group_by(year, month) %>%
-      reframe(mean.sst = mean(sst)-273.15) -> sst_1970.2022_BristolBay
+      reframe(mean.sst = mean(sst)-273.15) -> sst_1970.2023_BristolBay
     
-    write.csv(sst_1970.2022_BristolBay, "./data/sst_1970.2022_BristolBay")
+    write.csv(sst_1970.2023_BristolBay, "./data/sst_1970.2023_BristolBay")
     
 # now process
-    sst <- sst_1970.2022_BristolBay %>%
+    sst <- sst_1970.2023_BristolBay %>%
       mutate(year = as.numeric(as.character(year)),
              month = as.factor(as.character(month))) %>%
       filter(month %in% c("Jan", "Feb", "Mar", "Apr", "May", "Jun"),
-             year %in% 1975:2022) %>%
+             year %in% 1975:2023) %>%
       pivot_wider(names_from = month,
                   values_from = mean.sst)
 
@@ -270,7 +335,7 @@ ice <- ice %>%
     scaled_sst[,2:7] <- apply(scaled_sst[,2:7], 2, scale)
     
     # and get Jan-Jun mean
-mean_scaled_sst <- data.frame(year = 1975:2022,
+mean_scaled_sst <- data.frame(year = 1975:2023,
                               Jan_Jun_SST = rowMeans(scaled_sst[,2:7]))
   
 ## process bottom temperature data -------------------------------
@@ -291,7 +356,9 @@ mean_scaled_sst <- data.frame(year = 1975:2022,
     list.files(haulinfo_path, ignore.case = TRUE) %>%
       map_df(~read.csv(paste0(haulinfo_path, .x))) -> dat
     
+    dat <- read.csv("Y:/KOD_Survey/EBS Shelf/2024/Tech Memo/Data/HAUL_NEWTIMESERIES.csv")
     
+       
     as.integer(count(data.frame(unique(dat$SURVEY_YEAR))))-5-> min.years # calculates the minimum number of years that must be present to use a station
     
     
@@ -426,7 +493,7 @@ mean_scaled_sst <- data.frame(year = 1975:2022,
     sum(check) # 131 missing
     
     # % missing
-    sum(check) / (48*length(unique(use.dat$station)))
+    sum(check) / (49*length(unique(use.dat$station)))
     
     
     # examine correlations
@@ -587,7 +654,7 @@ write.csv(raw_dat, "./data/sst_temp_original_units.csv", row.names = F)
 
 #### combine the different time series----------------------
 
-combined_data <- data.frame(year = 1975:2022) %>%
+combined_data <- data.frame(year = 1975:2023) %>%
   left_join(., scaled_bottom_temp) %>%
   left_join(., ice) %>%
   left_join(., mean_scaled_sst)
@@ -622,7 +689,7 @@ dfa.dat <- plot_combined %>%
   dplyr::select(-year) %>%
   t()
 
-colnames(dfa.dat) <- 1975:2022
+colnames(dfa.dat) <- 1975:2023
 
 # and plot correlations
 cors <- cor(t(dfa.dat), use = "p")
@@ -640,7 +707,7 @@ levels.R = c("diagonal and equal",
 model.data = data.frame()
 
 # changing convergence criterion to ensure convergence
-cntl.list = list(minit=200, maxit=20000, allow.degen=FALSE, conv.test.slope.tol=0.1, abstol=0.0001)
+cntl.list = list(minit=200, maxit=2000, allow.degen=FALSE, conv.test.slope.tol=0.1, abstol=0.0001)
 
 # fit models & store results
 for(R in levels.R) {
@@ -670,7 +737,7 @@ model.data <- model.data %>%
 model.data # unconstrained is the best model 
 
 # fit the best model
-model.list = list(A="zero", m=1, R="unconstrained") # second-best model 
+model.list = list(A="zero", m=1, R="unconstrained")  
 
 mod = MARSS(dfa.dat, model=model.list, z.score=TRUE, form="dfa", control=cntl.list)
 
@@ -697,7 +764,7 @@ loadings.plot <- ggplot(plot.CI, aes(x=names, y=mean)) +
   geom_hline(yintercept = 0)
 
 # plot trend
-trend <- data.frame(t=1975:2022,
+trend <- data.frame(t=1975:2023,
                     estimate=as.vector(mod$states),
                     conf.low=as.vector(mod$states)-1.96*as.vector(mod$states.se),
                     conf.high=as.vector(mod$states)+1.96*as.vector(mod$states.se))
@@ -728,7 +795,7 @@ write.csv(trend, "./Output/dfa_trend.csv", row.names = F)
 ## plot predicted / observed values
 
 DFA_pred <- print(predict(mod)) %>%
-  mutate(year = rep(1975:2022, 4))
+  mutate(year = rep(1975:2023, 4))
 
 ggplot(DFA_pred, aes(estimate, y)) +
   geom_text(aes(label = year)) +
