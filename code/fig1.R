@@ -3,7 +3,6 @@
 library(tidyverse)
 library(ggpubr)
 library(terra)
-library(rgdal)
 library(sf)
 
 theme_set(theme_bw())
@@ -33,7 +32,7 @@ crab_plot <- ggplot(plot_rkc, aes(year, value, color = name)) +
 crab_plot
 
 ph_dat <- read.csv("./data/pH_annual_values_2023.csv") %>%
-  rename(year = `ï..Year`,
+  rename(year = Year,
          BB_pH = Bristol.Bay.mean) %>%
   select(year, BB_pH)
 
@@ -134,17 +133,21 @@ trend.plot <- ggplot(trend, aes(t, estimate)) +
   geom_ribbon(aes(x=t, ymin=conf.low, ymax=conf.high), linetype=2, alpha=0.1, fill=cb[6]) + xlab("") + ylab("Temperature index")
 
 # Bristol Bay map
+  source("Y:/KOD_Survey/EBS Shelf/Spatial crab/load.spatialdata.R") 
   map.crs <- "EPSG:3338" # mapping crs
   crs.latlon <- "epsg:4326" #lat lon crs
   
   region_layers <- akgfmaps::get_base_layers(select.region = "bs.south", set.crs=map.crs) # get AK base layers
   surv_area <- region_layers$survey.area %>% vect() # load survey area
+  BB_strata <- terra::vect(SAP_layers, layer = "BristolBay_strata") %>%
+    terra::project(map.crs)# can also use sf::st_read() to read layers in as sf objects
   
-  survey_gdb<- "./Data/SAP_layers.gdb" # set gdb to get survey strata
   
-  readOGR(dsn=survey_gdb,layer="BristolBaySurveyStrata") %>%
-    vect(crs = crs.latlon) %>%
-    terra::project(map.crs) -> BB_strata # load BB survey strata
+  #survey_gdb<- "./Data/SAP_layers.gdb" # set gdb to get survey strata
+  
+  # readOGR(dsn=survey_gdb,layer="BristolBaySurveyStrata") %>%
+  #   vect(crs = crs.latlon) %>%
+  #   terra::project(map.crs) -> BB_strata # load BB survey strata
   
   # Set up plot boundary
   plot.boundary.untrans <- data.frame(y = c(52.75, 66),
