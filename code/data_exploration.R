@@ -18,10 +18,10 @@ theme_set(theme_bw())
 cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 # load data
-rdat <- read.csv("./data/_23_0a_recruit_mfem_out.csv", row.names = 1)
+rdat <- read.csv("./data/_23_0a_recruit_mfem_out_2023.csv", row.names = 1)
 
-ph_dat <- read.csv("./data/pH_annual_values.csv") %>%
-  rename(year = Year,
+ph_dat <- read.csv("./data/pH_annual_values_2023.csv") %>%
+  rename(year = ï..Year,
          BB_pH = Bristol.Bay.mean) %>%
   select(year, BB_pH)
 
@@ -93,7 +93,8 @@ temp_dat <- temp_dat %>%
 # start with assumed age of 5 for model recruits
 
 dat <- rdat %>%
-  mutate(lag5_S = lag(mat_fem_GE90, 5),
+  rename(rec = totalr) %>%
+  mutate(lag5_S = lag(mat_total, 5),
          log_R_S = log(rec/lag5_S)) %>%
   select(year, lag5_S, log_R_S)
 
@@ -381,8 +382,8 @@ plot(conditional_smooths(brms_ph_model5), ask = FALSE)
 
 # residual time series for this model
 residuals <- as.data.frame(resid(brms_ph_model5)) %>%
-  mutate(year = 1980:2022,
-         log_R_S = dat$log_R_S[dat$year %in% 1980:2022])
+  mutate(year = 1980:2023,
+         log_R_S = dat$log_R_S[dat$year %in% 1980:2023])
 
 ggplot(residuals, aes(year, Estimate)) +
   geom_point() +
@@ -691,6 +692,7 @@ age_diff <- plot %>%
 age_diff
 
 # plot best models
+ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 bayes_R2(ph_brms5)
 
 conditional_effects(ph_brms5)
