@@ -10,11 +10,11 @@ theme_set(theme_bw())
 
 cb <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-rdat <- read.csv("./data/_23_0a_recruit_mfem_out.csv", row.names = 1)
+rdat <- read.csv("./data/_23_0a_recruit_mfem_out_2023.csv", row.names = 1)
 
 plot_rkc <- rdat %>%
-  select(year, mat_fem_GE90, rec) %>%
-  filter(year < 2023)
+  select(year, mat_total, totalr) %>%
+  filter(year < 2024)
 
 names(plot_rkc)[2:3] <- c("Mature females", "Recruits")
 
@@ -32,8 +32,8 @@ crab_plot <- ggplot(plot_rkc, aes(year, value, color = name)) +
 
 crab_plot
 
-ph_dat <- read.csv("./data/pH_annual_values.csv") %>%
-  rename(year = Year,
+ph_dat <- read.csv("./data/pH_annual_values_2023.csv") %>%
+  rename(year = `ï..Year`,
          BB_pH = Bristol.Bay.mean) %>%
   select(year, BB_pH)
 
