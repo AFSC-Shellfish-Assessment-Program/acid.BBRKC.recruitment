@@ -482,8 +482,8 @@ loo_compare <- loo(temp_brms1, temp_brms2, temp_brms3, temp_brms4, temp_brms5,
 saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
 
 ## compare with a model invoking pH and temperature ------------------------
-cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
-cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4, use = "p") # r = -0.28
+cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.38
+cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4, use = "p") # r = -0.35
 
 both_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 4) +s(temp_index_lag4, k = 4) + 
                    ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
@@ -514,7 +514,7 @@ plot(conditional_smooths(brms_both_model5), ask = FALSE)
 
 ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 
-compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
+compare <- loo(ph_brms5, brms_both_model5)
 
 compare$ic_diffs
 
@@ -671,6 +671,14 @@ plot$Age <- reorder(plot$Age, plot$age_order)
 # add difference from smallest looic value
 plot <- plot %>%
   mutate(looic.diff = looic - min(looic))
+
+# and difference between pH and temp for each candidate age
+looic_age <- plot %>%
+  select(Covariate, Age, looic) %>%
+  pivot_wider(names_from = Covariate,
+              values_from = looic) %>%
+  mutate(age_looic_diff = `Warming index` - pH)
+  
 
 compare_plot <- ggplot(plot, aes(Age, looic.diff, color = Covariate, fill = Covariate)) +
   geom_col(position = "dodge") +
