@@ -606,7 +606,7 @@ loo(ph_brms5, brms_both_model5, moment_match = T) # elpd_diff = -0.6, se_diff = 
 
 
 
-## finally, fit pH model to 2000-2022 data-----------
+## finally, fit pH model to 2000-2023 data-----------
 
 ph_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag4_3_2_1_0, k = 3) + # reducing k to 3 to avoid over-fitting
                    ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag4_3_2_1_0)
