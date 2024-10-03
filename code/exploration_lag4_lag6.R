@@ -492,6 +492,8 @@ ph_brms4 <- readRDS("./output/brms_ph_model4_lag6RS.rds")
 ph_brms5 <- readRDS("./output/brms_ph_model5_lag6RS.rds")
 ph_brms6 <- readRDS("./output/brms_ph_model6_lag6RS.rds")
 
+loo_compare_ph <- brms::loo(ph_brms1, ph_brms2, ph_brms3, ph_brms4, ph_brms5, ph_brms6, moment_match = T)
+
 loo_compare <- brms::loo(temp_brms1, temp_brms2, temp_brms3, temp_brms4, temp_brms5, temp_brms6,
                    ph_brms1, ph_brms2, ph_brms3, ph_brms4, ph_brms5, ph_brms6, moment_match = T)
 
