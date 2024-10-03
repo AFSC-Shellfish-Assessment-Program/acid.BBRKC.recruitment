@@ -474,7 +474,7 @@ summary(brms_temp_model6)
 plot(conditional_smooths(brms_temp_model6), ask = FALSE)
 
 #####################################
-# load all the model objects
+# load all the model objects -----------------------
 
 temp_brms1 <- readRDS("./output/brms_temp_model1_lag6RS.rds")
 temp_brms2 <- readRDS("./output/brms_temp_model2_lag6RS.rds")
@@ -498,7 +498,465 @@ loo_compare <- brms::loo(temp_brms1, temp_brms2, temp_brms3, temp_brms4, temp_br
                    ph_brms1, ph_brms2, ph_brms3, ph_brms4, ph_brms5, ph_brms6, moment_match = T)
 
 # save 
-saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison.rds")
+saveRDS(loo_compare, "./output/ph_temp_brms_model_comparison_lag6RS.rds")
+
+## now fit with lag 4 in SR relationship------------
+
+# reload data
+rdat <- read.csv("./data/_23_0a_recruit_mfem_out_2023.csv", row.names = 1)
+
+ph_dat <- read.csv("./data/pH_annual_values_2023.csv") %>%
+  rename(year = ï..Year,
+         BB_pH = Bristol.Bay.mean) %>%
+  select(year, BB_pH)
+
+## 4-yr lag between spawning and recruitment to the survey
+
+# so we will examine pH and temperature effects at lags 0 through 3 - from settlement through year of observation
+ph_dat <- ph_dat %>%
+  mutate(BB_pH_lag3 = lag(BB_pH, 3),
+         BB_pH_lag2 = lag(BB_pH, 2),
+         BB_pH_lag1 = lag(BB_pH, 1))
+
+
+ph_dat$BB_ph_lag3_2 <- ph_dat$BB_ph_lag3_2_1 <- ph_dat$BB_ph_lag3_2_1_0 <- NA
+
+for(i in 1:nrow(ph_dat)){
+  
+  ph_dat$BB_ph_lag3_2_1_0[i] <- mean(as.vector(c(ph_dat[i,2], ph_dat[i,3], ph_dat[i,4], ph_dat[i,5]))) 
+  
+  ph_dat$BB_ph_lag3_2_1[i] <- mean(as.vector(c(ph_dat[i,3], ph_dat[i,4], ph_dat[i,5])))
+  
+  ph_dat$BB_ph_lag3_2[i] <- mean(as.vector(c(ph_dat[i,3], ph_dat[i,4])))
+
+}
+
+ph_dat <- ph_dat %>%
+  select(1,3,8,7,6)
+
+# load temperature DFA trend
+temp_dat <- read.csv("./output/dfa_trend.csv") %>%
+  rename(year = t, 
+         temp_index = estimate) %>%
+  select(year, temp_index)
+
+temp_dat <- temp_dat %>%
+  mutate(temp_index_lag3 = lag(temp_index, 3),
+         temp_index_lag2 = lag(temp_index, 2),
+         temp_index_lag1 = lag(temp_index, 1))
+
+
+temp_dat$temp_index_lag3_2 <- temp_dat$temp_index_lag3_2_1 <- temp_dat$temp_index_lag3_2_1_0 <- NA
+
+for(i in 1:nrow(temp_dat)){
+  
+  temp_dat$temp_index_lag3_2_1_0[i] <- mean(as.vector(c(temp_dat[i,2], temp_dat[i,3], temp_dat[i,4], temp_dat[i,5]))) 
+  
+  temp_dat$temp_index_lag3_2_1[i] <- mean(as.vector(c(temp_dat[i,3], temp_dat[i,4], temp_dat[i,5])))
+  
+  temp_dat$temp_index_lag3_2[i] <- mean(as.vector(c(temp_dat[i,3], temp_dat[i,4])))
+
+}
+
+
+# age distributions of recruits in assessment model
+# these are the proportions assigned to
+# 65-70mm, 70-75mm, 75-80mm, 80-85mm, 85-90mm, 90-95mm, 95-100mm
+
+# Males proportions:
+#   
+#   0.26821432   0.32387433   0.24116113   0.11710765   0.03887032   0.00917743   0.00159482
+# 
+# Female proportions:
+#   
+#   0.27245822   0.38053177   0.24900488   0.08292921   0.01507593
+
+# assumed age of 6 for model recruits
+
+dat <- rdat %>%
+  rename(rec = totalr) %>%
+  mutate(lag4_S = lag(mat_total, 4),
+         log_R_S = log(rec/lag4_S)) %>%
+  select(year, lag4_S, log_R_S)
+
+# add ph and temperature data
+dat <- left_join(dat, ph_dat) %>%
+  left_join(., temp_dat)
+
+
+ggplot(dat, aes(lag4_S, log_R_S)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 4)) # overfit
+
+
+ggplot(dat, aes(lag4_S, log_R_S)) +
+  geom_point() +
+  geom_smooth(method = "gam", formula = y ~ s(x, k = 3))
+
+# evaluate S-R relationship before recent era of low R
+mod <- gam(log_R_S ~ s(lag4_S, k = 3), data = dat[dat$year <= 2010,])
+summary(mod)
+plot(mod, resid = T, pch = 19)
+
+# and for the full time series
+mod <- gam(log_R_S ~ s(lag4_S, k = 3), data = dat)
+summary(mod)
+plot(mod, resid = T, pch = 19)
+
+# no S-R relationship to account for
+
+## fit brms models with ar and sigma ~ X-----------------------------------------------------------
+priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
+            set_prior("student_t(3, 0, 3)", class = "b"),
+            set_prior("student_t(3, 0, 3)", class = "sds"),
+            set_prior("normal(0, 0.5)", class = "ar"))
+
+
+## lag 3 only
+
+# ph version
+ph_form1 <- bf(log_R_S ~ 1 + s(BB_pH_lag3, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_pH_lag3)
+
+## fit ph
+brms_ph_model1 <- brm(ph_form1,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model1, file = "./output/brms_ph_model1_lag4RS.rds")
+
+brms_ph_model1 <- readRDS("./output/brms_ph_model1_lag4RS.rds")
+
+check_hmc_diagnostics(brms_ph_model1$fit)
+
+neff_lowest(brms_ph_model1$fit)
+
+rhat_highest(brms_ph_model1$fit)
+
+summary(brms_ph_model1)
+
+# bayes_R2(brms_ph_model1) # commenting this out to keep it from hanging the script!
+
+plot(conditional_smooths(brms_ph_model1), ask = FALSE)
+
+
+## fit temp
+temp_form1 <- bf(log_R_S ~ 1 + s(temp_index_lag3, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag3)
+
+brms_temp_model1 <- brm(temp_form1,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model1, file = "./output/brms_temp_model1_lag4RS.rds")
+
+brms_temp_model1 <- readRDS("./output/brms_temp_model1_lag4RS.rds")
+
+check_hmc_diagnostics(brms_temp_model1$fit)
+
+neff_lowest(brms_temp_model1$fit)
+
+rhat_highest(brms_temp_model1$fit)
+
+summary(brms_temp_model1)
+
+# bayes_R2(brms_temp_model1)
+
+plot(conditional_smooths(brms_temp_model1), ask = FALSE)
+
+## lag 3_2 ##
+
+# ph version
+ph_form2 <- bf(log_R_S ~ 1 + s(BB_ph_lag3_2, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag3_2)
+
+## fit ph
+brms_ph_model2 <- brm(ph_form2,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model2, file = "./output/brms_ph_model2_lag4RS.rds")
+
+brms_ph_model2 <- readRDS("./output/brms_ph_model2_lag4RS.rds")
+
+check_hmc_diagnostics(brms_ph_model2$fit)
+
+neff_lowest(brms_ph_model2$fit)
+
+rhat_highest(brms_ph_model2$fit)
+
+summary(brms_ph_model2)
+
+# bayes_R2(brms_ph_model2)
+
+plot(conditional_smooths(brms_ph_model2), ask = FALSE)
+
+
+## fit temp
+temp_form2 <- bf(log_R_S ~ 1 + s(temp_index_lag3_2, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag3_2)
+
+brms_temp_model2 <- brm(temp_form2,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model2, file = "./output/brms_temp_model2_lag4RS.rds")
+
+brms_temp_model2 <- readRDS("./output/brms_temp_model2_lag4RS.rds")
+
+check_hmc_diagnostics(brms_temp_model2$fit)
+
+neff_lowest(brms_temp_model2$fit)
+
+rhat_highest(brms_temp_model2$fit)
+
+summary(brms_temp_model2)
+
+# bayes_R2(brms_temp_model2)
+
+plot(conditional_smooths(brms_temp_model2), ask = FALSE)
+
+## lag 3_2_1
+# ph version
+ph_form3 <- bf(log_R_S ~ 1 + s(BB_ph_lag3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag3_2_1)
+
+## fit ph
+brms_ph_model3 <- brm(ph_form3,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model3, file = "./output/brms_ph_model3_lag4RS.rds")
+
+brms_ph_model3 <- readRDS("./output/brms_ph_model3_lag4RS.rds")
+
+check_hmc_diagnostics(brms_ph_model3$fit)
+
+neff_lowest(brms_ph_model3$fit)
+
+rhat_highest(brms_ph_model3$fit)
+
+summary(brms_ph_model3)
+
+# bayes_R2(brms_ph_model3)
+
+plot(conditional_smooths(brms_ph_model3), ask = FALSE)
+
+
+## fit temp
+temp_form3 <- bf(log_R_S ~ 1 + s(temp_index_lag3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag3_2_1)
+
+brms_temp_model3 <- brm(temp_form3,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model3, file = "./output/brms_temp_model3_lag4RS.rds")
+
+brms_temp_model3 <- readRDS("./output/brms_temp_model3_lag4RS.rds")
+
+check_hmc_diagnostics(brms_temp_model3$fit)
+
+neff_lowest(brms_temp_model3$fit)
+
+rhat_highest(brms_temp_model3$fit)
+
+summary(brms_temp_model3)
+
+# bayes_R2(brms_temp_model3)
+
+plot(conditional_smooths(brms_temp_model3), ask = FALSE)
+
+## lag 3_2_1_0
+# ph version
+ph_form4 <- bf(log_R_S ~ 1 + s(BB_ph_lag3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag3_2_1_0)
+
+## fit ph
+brms_ph_model4 <- brm(ph_form4,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model4, file = "./output/brms_ph_model4_lag4RS.rds")
+
+brms_ph_model4 <- readRDS("./output/brms_ph_model4_lag4RS.rds")
+
+check_hmc_diagnostics(brms_ph_model4$fit)
+
+neff_lowest(brms_ph_model4$fit)
+
+rhat_highest(brms_ph_model4$fit)
+
+summary(brms_ph_model4)
+
+# bayes_R2(brms_ph_model4)
+
+plot(conditional_smooths(brms_ph_model4), ask = FALSE)
+
+
+## fit temp
+temp_form4 <- bf(log_R_S ~ 1 + s(temp_index_lag3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag3_2_1_0)
+
+brms_temp_model4 <- brm(temp_form4,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model4, file = "./output/brms_temp_model4_lag4RS.rds")
+
+brms_temp_model4 <- readRDS("./output/brms_temp_model4_lag4RS.rds")
+
+check_hmc_diagnostics(brms_temp_model4$fit)
+
+neff_lowest(brms_temp_model4$fit)
+
+rhat_highest(brms_temp_model4$fit)
+
+summary(brms_temp_model4)
+
+# bayes_R2(brms_temp_model4)
+
+plot(conditional_smooths(brms_temp_model4), ask = FALSE)
+
+## lag 5_4_3_2_1
+# ph version
+ph_form5 <- bf(log_R_S ~ 1 + s(BB_ph_lag5_4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag5_4_3_2_1)
+
+## fit ph
+brms_ph_model5 <- brm(ph_form5,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model5, file = "./output/brms_ph_model5_lag6RS.rds")
+
+brms_ph_model5 <- readRDS("./output/brms_ph_model5_lag6RS.rds")
+
+check_hmc_diagnostics(brms_ph_model5$fit)
+
+neff_lowest(brms_ph_model5$fit)
+
+rhat_highest(brms_ph_model5$fit)
+
+summary(brms_ph_model5)
+
+# bayes_R2(brms_ph_model5)
+
+plot(conditional_smooths(brms_ph_model5), ask = FALSE)
+
+
+## fit temp
+temp_form5 <- bf(log_R_S ~ 1 + s(temp_index_lag5_4_3_2_1, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag5_4_3_2_1)
+
+brms_temp_model5 <- brm(temp_form5,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model5, file = "./output/brms_temp_model5_lag6RS.rds")
+
+brms_temp_model5 <- readRDS("./output/brms_temp_model5_lag6RS.rds")
+
+check_hmc_diagnostics(brms_temp_model5$fit)
+
+neff_lowest(brms_temp_model5$fit)
+
+rhat_highest(brms_temp_model5$fit)
+
+summary(brms_temp_model5)
+
+# bayes_R2(brms_temp_model5)
+
+plot(conditional_smooths(brms_temp_model5), ask = FALSE)
+
+## lag 5_4_3_2_1_0
+# ph version
+ph_form6 <- bf(log_R_S ~ 1 + s(BB_ph_lag5_4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ BB_ph_lag5_4_3_2_1_0)
+
+## fit ph
+brms_ph_model6 <- brm(ph_form6,
+                      data = dat,
+                      prior = priors,
+                      cores = 4, chains = 4, iter = 2000,
+                      save_pars = save_pars(all = TRUE),
+                      control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_ph_model6, file = "./output/brms_ph_model6_lag6RS.rds")
+
+brms_ph_model6 <- readRDS("./output/brms_ph_model6_lag6RS.rds")
+
+check_hmc_diagnostics(brms_ph_model6$fit)
+
+neff_lowest(brms_ph_model6$fit)
+
+rhat_highest(brms_ph_model6$fit)
+
+summary(brms_ph_model6)
+
+# bayes_R2(brms_ph_model6)
+
+plot(conditional_smooths(brms_ph_model6), ask = FALSE)
+
+
+## fit temp
+temp_form6 <- bf(log_R_S ~ 1 + s(temp_index_lag5_4_3_2_1_0, k = 4) + ar(time = year, p = 1, cov = TRUE), sigma ~ temp_index_lag5_4_3_2_1_0)
+
+brms_temp_model6 <- brm(temp_form6,
+                        data = dat,
+                        prior = priors,
+                        cores = 4, chains = 4, iter = 2000,
+                        save_pars = save_pars(all = TRUE),
+                        control = list(adapt_delta = 0.999, max_treedepth = 10))
+
+saveRDS(brms_temp_model6, file = "./output/brms_temp_model6_lag6RS.rds")
+
+brms_temp_model6 <- readRDS("./output/brms_temp_model6_lag6RS.rds")
+
+check_hmc_diagnostics(brms_temp_model6$fit)
+
+neff_lowest(brms_temp_model6$fit)
+
+rhat_highest(brms_temp_model6$fit)
+
+summary(brms_temp_model6)
+
+# bayes_R2(brms_temp_model6)
+
+plot(conditional_smooths(brms_temp_model6), ask = FALSE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## compare with a model invoking pH and temperature ------------------------
 cor(dat$BB_ph_lag4_3_2_1_0, dat$temp_index_lag4_3_2_1_0, use = "p") # r = -0.35
