@@ -130,6 +130,7 @@ priors <- c(set_prior("student_t(3, 0, 3)", class = "Intercept"),
             set_prior("student_t(3, 0, 3)", class = "sds"),
             set_prior("normal(0, 0.5)", class = "ar"))
 
+
 ## lag 4 only
 
 # ph version
