@@ -442,7 +442,7 @@ rhat_highest(brms_ph_model6$fit)
 
 summary(brms_ph_model6)
 
-# bayes_R2(brms_ph_model6)
+bayes_R2(brms_ph_model6)
 
 plot(conditional_smooths(brms_ph_model6), ask = FALSE)
 
