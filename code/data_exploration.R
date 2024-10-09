@@ -602,7 +602,9 @@ qqline(residuals, col = "steelblue", lwd = 2)
 # one more model comparison - combined model v. best ph-only model
 ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 
-loo(ph_brms5, brms_both_model5, moment_match = T) # elpd_diff = -0.6, se_diff = 1.0
+compare <- loo(ph_brms5, brms_both_model5) # elpd_diff = -0.6, se_diff = 1.0
+
+compare$ic_diffs
 # no support for the model invoking both
 
 
@@ -638,9 +640,7 @@ plot(conditional_smooths(brms_ph_model5_2000), ask = FALSE)
 
 ph_brms5<- readRDS("./output/brms_ph_model5.rds")
 
-compare <- loo(ph_brms5, brms_both_model5, moment_match = T)
 
-compare$ic_diffs
 
 
 
