@@ -189,12 +189,11 @@ trend.plot <- ggplot(trend, aes(t, estimate)) +
 # and combine
 # void.plot <- ggplot() + theme_void()
 # 
-# png("./figs/fig1.png", width = 8, height = 10, units = 'in', res = 300)
+pdf("./figs/fig1.pdf", width = 8, height = 10, units = 'in', res = 300)
 
 ggarrange(BB_map, crab_plot, R.S_plot, ph_plot, ice_plot, temp_plot, loadings.plot, trend.plot,
           ncol = 2, nrow = 4,
           labels = "auto")
 
-ggsave("./figs/fig1.png", width = 8, height = 10, units = 'in')
 dev.off()
 
