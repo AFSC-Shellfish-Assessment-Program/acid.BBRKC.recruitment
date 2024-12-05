@@ -32,7 +32,7 @@ crab_plot <- ggplot(plot_rkc, aes(year, value, color = name)) +
 crab_plot
 
 ph_dat <- read.csv("./data/pH_annual_values_2023.csv") %>%
-  rename(year = Year,
+  rename(year = ï..Year,
          BB_pH = Bristol.Bay.mean) %>%
   select(year, BB_pH)
 
