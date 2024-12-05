@@ -786,7 +786,7 @@ temp_model_plot
 
 
 ##
-png("./figs/fig2.png", width = 5, height = 10, units = 'in', res = 300)
+pdf("./figs/fig2.pdf", width = 5, height = 10)
 
 ggpubr::ggarrange(compare_plot, ph_model_plot, temp_model_plot, 
                   ncol = 1,
